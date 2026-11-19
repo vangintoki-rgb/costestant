@@ -7,6 +7,7 @@ import {
   DURASI_MAX,
   DURASI_MIN,
   KATEGORI,
+  PLACEHOLDER_IMAGE,
   STATUS,
   UKURAN,
   WHATSAPP_NUMBER,
@@ -31,6 +32,12 @@ const STATUS_CLASS = Object.freeze({
   Tersedia: 'badge--tersedia',
   'Sedang Disewa': 'badge--disewa',
   Perawatan: 'badge--perawatan',
+});
+
+const STATUS_SLUG = Object.freeze({
+  Tersedia: 'tersedia',
+  'Sedang Disewa': 'disewa',
+  Perawatan: 'perawatan',
 });
 
 /** Escape teks bebas bila suatu saat dipakai dalam string HTML. */
@@ -88,6 +95,54 @@ function warningIcon() {
     'stroke-width': 2.5,
   });
   svg.appendChild(svgEl('path', { d: 'M12 3L2 21h20L12 3zm0 6v5zm0 3h.01' }));
+  return svg;
+}
+
+/** Ikon peringatan besar untuk banner (stroke mengikuti warna teks). */
+function bannerIcon() {
+  const svg = svgEl('svg', {
+    width: 18,
+    height: 18,
+    viewBox: '0 0 24 24',
+    fill: 'none',
+    stroke: 'currentColor',
+    'stroke-width': 2.5,
+  });
+  svg.appendChild(svgEl('path', { d: 'M12 3L2 21h20L12 3zm0 6v5zm0 3h.01' }));
+  return svg;
+}
+
+function editIcon() {
+  const svg = svgEl('svg', {
+    width: 14,
+    height: 14,
+    viewBox: '0 0 24 24',
+    fill: 'none',
+    stroke: 'currentColor',
+    'stroke-width': 2.5,
+    'stroke-linecap': 'round',
+    'stroke-linejoin': 'round',
+  });
+  svg.appendChild(svgEl('path', { d: 'M12 20h9' }));
+  svg.appendChild(svgEl('path', { d: 'M16.5 3.5a2.1 2.1 0 0 1 3 3L7 19l-4 1 1-4 12.5-12.5z' }));
+  return svg;
+}
+
+function trashIcon() {
+  const svg = svgEl('svg', {
+    width: 14,
+    height: 14,
+    viewBox: '0 0 24 24',
+    fill: 'none',
+    stroke: 'currentColor',
+    'stroke-width': 2.5,
+    'stroke-linecap': 'round',
+    'stroke-linejoin': 'round',
+  });
+  svg.appendChild(svgEl('path', { d: 'M3 6h18' }));
+  svg.appendChild(svgEl('path', { d: 'M8 6V4h8v2' }));
+  svg.appendChild(svgEl('path', { d: 'M19 6l-1 14H6L5 6' }));
+  svg.appendChild(svgEl('path', { d: 'M10 11v5m4-5v5' }));
   return svg;
 }
 
@@ -357,6 +412,11 @@ export function renderLayout(root) {
   hero.appendChild(heroInner);
   root.appendChild(hero);
 
+  // Banner peringatan persistensi/import — di luar panel agar tidak hilang saat render.
+  const bannerHost = createEl('div', 'container banner-host');
+  bannerHost.setAttribute('aria-live', 'polite');
+  root.appendChild(bannerHost);
+
   // ---- Dua panel tab ----
   const main = createEl('main', 'container page-main');
   const katalogPanel = createEl('section', 'tab-panel');
@@ -400,8 +460,9 @@ export function renderLayout(root) {
   footer.appendChild(footerInner);
   root.appendChild(footer);
 
-  // Modal detail dibuat sekali di awal agar bisa dibuka dari kartu mana pun.
+  // Modal dibuat sekali di awal agar bisa dibuka dari kartu/baris mana pun.
   createDetailModal();
+  buildFormModal();
 
   return {
     tabs: [tabKatalog, tabDashboard],
@@ -410,6 +471,7 @@ export function renderLayout(root) {
     gridHost,
     controls,
     resultCount,
+    bannerHost,
     dashboard,
     stockNumber,
     heroSearch,
@@ -471,8 +533,130 @@ export function renderKatalog(gridHost, products) {
   gridHost.appendChild(grid);
 }
 
-/** Render 3 kartu statistik sesuai rumus SPEC.md 4.3. */
-export function renderDashboard(container, stats) {
+/* ------------------------------------------------------------
+   Dashboard pengelola (M5): statistik + daftar/CRUD
+   ------------------------------------------------------------ */
+
+function withFallback(image) {
+  image.onerror = () => {
+    if (image.dataset.fallback !== '1') {
+      image.dataset.fallback = '1';
+      image.src = FALLBACK_IMAGE;
+    }
+  };
+  return image;
+}
+
+/** Select status dipakai ulang di baris tabel dan kartu mobile. */
+function createStatusSelect(product) {
+  const status = STATUS.includes(product.status) ? product.status : 'Perawatan';
+  const select = createEl('select', `status-select status-select--${STATUS_SLUG[status]}`);
+  STATUS.forEach((option) => {
+    const item = createEl('option', null, option);
+    item.value = option;
+    select.appendChild(item);
+  });
+  select.value = status;
+  select.dataset.action = 'quick-status';
+  select.dataset.id = product.id;
+  select.dataset.focusKey = `${product.id}:status`;
+  select.setAttribute('aria-label', `Ubah status ${product.nama}`);
+  return select;
+}
+
+function createActionButtons(product) {
+  const edit = createEl('button', 'btn btn-edit', '');
+  edit.type = 'button';
+  edit.dataset.action = 'open-form';
+  edit.dataset.mode = 'edit';
+  edit.dataset.id = product.id;
+  edit.dataset.focusKey = `${product.id}:edit`;
+  edit.appendChild(editIcon());
+  edit.appendChild(createEl('span', null, 'EDIT'));
+
+  const hapus = createEl('button', 'btn btn-hapus', '');
+  hapus.type = 'button';
+  hapus.dataset.action = 'delete-product';
+  hapus.dataset.id = product.id;
+  hapus.dataset.focusKey = `${product.id}:delete`;
+  hapus.appendChild(trashIcon());
+  hapus.appendChild(createEl('span', null, 'HAPUS'));
+  return [edit, hapus];
+}
+
+function createManageIdentity(product) {
+  const wrap = createEl('div', 'manage-kostum');
+  const image = withFallback(createEl('img', 'thumb'));
+  image.src = product.imageUrl || FALLBACK_IMAGE;
+  image.alt = '';
+  image.loading = 'lazy';
+  const names = createEl('div');
+  names.appendChild(createEl('strong', null, product.nama));
+  names.appendChild(createEl('span', 'cell-sub', product.asal));
+  append(wrap, image, names);
+  return wrap;
+}
+
+/** Baris tabel desktop — semua teks dari data user lewat textContent. */
+function createManageRow(product) {
+  const row = createEl('tr');
+  row.dataset.id = product.id;
+
+  const kostum = createEl('td');
+  kostum.appendChild(createManageIdentity(product));
+  row.appendChild(kostum);
+  row.appendChild(createEl('td', 'cell-enum', String(product.kategori).toUpperCase()));
+  row.appendChild(createEl('td', 'cell-enum', String(product.ukuran).toUpperCase()));
+  row.appendChild(
+    createEl('td', 'cell-harga', `${formatRupiah(product.hargaPer2Hari)} / 2 HARI`),
+  );
+  row.appendChild(createEl('td', 'cell-stok', `STOK: ${product.stok}`));
+
+  const statusCell = createEl('td');
+  statusCell.appendChild(createStatusSelect(product));
+  row.appendChild(statusCell);
+
+  const actionCell = createEl('td');
+  const actions = createEl('div', 'action-buttons');
+  append(actions, ...createActionButtons(product));
+  actionCell.appendChild(actions);
+  row.appendChild(actionCell);
+  return row;
+}
+
+/** Kartu manajemen untuk viewport < lg (UI-SPEC.md 3.6 / 5.3). */
+function createManageCard(product) {
+  const card = createEl('article', 'manage-card');
+  card.dataset.id = product.id;
+
+  const top = createEl('div', 'manage-card-top');
+  top.appendChild(createManageIdentity(product));
+  top.appendChild(createStatusBadge(product.status));
+  card.appendChild(top);
+
+  const meta = createEl('div', 'manage-card-meta');
+  meta.appendChild(
+    createEl('span', 'label', `${product.kategori} · ${product.ukuran} · STOK: ${product.stok}`),
+  );
+  meta.appendChild(createEl('span', 'label', `${formatRupiah(product.hargaPer2Hari)} / 2 HARI`));
+  card.appendChild(meta);
+
+  const statusField = createEl('label', 'field manage-card-status');
+  statusField.appendChild(createEl('span', 'label', 'UBAH STATUS'));
+  statusField.appendChild(createStatusSelect(product));
+  card.appendChild(statusField);
+
+  const actions = createEl('div', 'manage-card-actions');
+  append(actions, ...createActionButtons(product));
+  card.appendChild(actions);
+  return card;
+}
+
+/** Render 3 kartu statistik + daftar manajemen (SPEC.md 4.3 / F3.1–F3.8). */
+export function renderDashboard(container, stats, products = []) {
+  const focusKey = container.contains(document.activeElement)
+    ? document.activeElement.dataset.focusKey
+    : null;
   container.replaceChildren();
 
   const head = createEl('div', 'section-heading');
@@ -500,19 +684,161 @@ export function renderDashboard(container, stats) {
   });
   container.appendChild(grid);
 
-  const notice = createEl('div', 'notice');
-  notice.appendChild(createEl('p', 'label', 'AKSI PENGELOLA'));
-  notice.appendChild(
-    createEl(
-      'p',
-      null,
-      'Tabel CRUD, form tambah/edit, ubah status cepat, hapus, dan reset hadir di Milestone 5.',
-    ),
-  );
-  container.appendChild(notice);
+  // Toolbar data: export/import/reset — diletakkan di bagian atas dashboard.
+  const toolbar = createEl('section', 'data-toolbar');
+  const toolbarLabel = createEl('div', 'data-toolbar-label');
+  toolbarLabel.appendChild(createEl('h3', 'label', 'DATA & CADANGAN'));
+  toolbarLabel.appendChild(createEl('p', 'section-sub', 'CADANGAN LOKAL — FORMAT JSON.'));
+  const toolbarActions = createEl('div', 'data-toolbar-actions');
+
+  const ekspor = createEl('button', 'btn btn-export', 'EXPORT JSON');
+  ekspor.type = 'button';
+  ekspor.dataset.action = 'export-json';
+
+  const impor = createEl('button', 'btn btn-import', 'IMPORT JSON');
+  impor.type = 'button';
+  impor.dataset.action = 'import-json';
+  impor.dataset.focusKey = 'toolbar:import';
+
+  const fileInput = createEl('input');
+  fileInput.type = 'file';
+  fileInput.accept = '.json,application/json';
+  fileInput.hidden = true;
+  fileInput.dataset.action = 'import-file';
+  fileInput.setAttribute('aria-label', 'Pilih file cadangan JSON');
+
+  const resetData = createEl('button', 'btn btn-reset-dummy label', 'RESET DATA DUMMY');
+  resetData.type = 'button';
+  resetData.dataset.action = 'reset-data';
+
+  append(toolbarActions, ekspor, impor, fileInput, resetData);
+  append(toolbar, toolbarLabel, toolbarActions);
+  container.appendChild(toolbar);
+
+  const manage = createEl('section', 'manage-panel');
+  const manageHead = createEl('div', 'manage-head');
+  const manageTitle = createEl('div');
+  manageTitle.appendChild(createEl('h3', 'display manage-title', 'KELOLA KOSTUM'));
+  manageTitle.appendChild(createEl('p', 'section-sub', `${products.length} kostum dalam katalog.`));
+  const actions = createEl('div', 'manage-actions');
+  const add = createEl('button', 'btn btn-primary', '+ TAMBAH KOSTUM');
+  add.type = 'button';
+  add.dataset.action = 'open-form';
+  add.dataset.mode = 'tambah';
+  actions.appendChild(add);
+  append(manageHead, manageTitle, actions);
+  manage.appendChild(manageHead);
+
+  const tableWrap = createEl('div', 'table-wrap');
+  const table = createEl('table', 'manage-table');
+  const thead = createEl('thead');
+  const headRow = createEl('tr');
+  [
+    'KOSTUM / ASAL',
+    'KATEGORI',
+    'UKURAN',
+    'HARGA',
+    'STOK',
+    'STATUS',
+    'AKSI',
+  ].forEach((text) => {
+    const cell = createEl('th', 'label', text);
+    cell.scope = 'col';
+    headRow.appendChild(cell);
+  });
+  thead.appendChild(headRow);
+  const tbody = createEl('tbody');
+  products.forEach((product) => tbody.appendChild(createManageRow(product)));
+  table.append(thead, tbody);
+  tableWrap.appendChild(table);
+  manage.appendChild(tableWrap);
+
+  const cardList = createEl('div', 'manage-card-list');
+  products.forEach((product) => cardList.appendChild(createManageCard(product)));
+  manage.appendChild(cardList);
+  container.appendChild(manage);
+
+  if (focusKey && typeof CSS !== 'undefined' && typeof CSS.escape === 'function') {
+    const target = container.querySelector(`[data-focus-key="${CSS.escape(focusKey)}"]`);
+    if (target) target.focus();
+  }
 }
 
-/** Toast sederhana (dipakai milestone berikutnya untuk feedback storage/CRUD). */
+/**
+ * Validasi murni untuk form Tambah/Edit (SPEC.md 4.2).
+ * `deskripsi` dan `imageUrl` yang kosong diisi default agar model tetap lengkap;
+ * nama/asal tetap wajib. Tidak ada penulisan state di sini.
+ */
+export function validateProductDraft(raw = {}) {
+  const errors = {};
+  const text = (key) => String(raw[key] ?? '').trim();
+  const nama = text('nama');
+  const asal = text('asal');
+  const kategori = text('kategori');
+  const ukuran = text('ukuran');
+  const status = text('status');
+  const hargaRaw = text('hargaPer2Hari');
+  const stokRaw = text('stok');
+
+  if (nama.length < 3 || nama.length > 80) errors.nama = 'NAMA WAJIB DIISI (3–80 KARAKTER).';
+  if (asal.length < 2 || asal.length > 80) errors.asal = 'ASAL WAJIB DIISI (2–80 KARAKTER).';
+  if (!KATEGORI.includes(kategori)) errors.kategori = 'PILIH KATEGORI YANG VALID.';
+  if (!UKURAN.includes(ukuran)) errors.ukuran = 'PILIH UKURAN YANG VALID.';
+
+  let hargaPer2Hari = 100000;
+  if (hargaRaw !== '') {
+    const value = Number(hargaRaw);
+    if (!Number.isInteger(value) || value < 0 || value > 100000000) {
+      errors.hargaPer2Hari = 'HARGA HARUS ANGKA BULAT 0–100000000.';
+    } else {
+      hargaPer2Hari = value;
+    }
+  }
+
+  let stok = 0;
+  if (stokRaw === '') {
+    errors.stok = 'STOK WAJIB DIISI (BILANGAN BULAT ≥ 0).';
+  } else {
+    const value = Number(stokRaw);
+    if (!Number.isInteger(value) || value < 0 || value > 999) {
+      errors.stok = 'STOK HARUS BILANGAN BULAT 0–999.';
+    } else {
+      stok = value;
+    }
+  }
+
+  if (!STATUS.includes(status)) errors.status = 'PILIH STATUS YANG VALID.';
+
+  let deskripsi = text('deskripsi');
+  if (deskripsi === '') deskripsi = 'Lengkap: kostum, wig, dan aksesoris sesuai tema.';
+  else if (deskripsi.length < 10 || deskripsi.length > 500) {
+    errors.deskripsi = 'DESKRIPSI HARUS 10–500 KARAKTER.';
+  }
+
+  let imageUrl = text('imageUrl');
+  if (imageUrl === '') imageUrl = PLACEHOLDER_IMAGE;
+  else if (!/^\/images\/[A-Za-z0-9._/-]+\.(svg|png|jpe?g|webp)$/i.test(imageUrl)) {
+    errors.imageUrl = 'PATH GAMBAR HARUS DI /images/ (SVG/PNG/JPG/WEBP).';
+  }
+
+  return {
+    errors,
+    values: {
+      nama,
+      asal,
+      kategori,
+      ukuran,
+      hargaPer2Hari,
+      stok,
+      status,
+      deskripsi,
+      imageUrl,
+      unggulan: Boolean(raw.unggulan),
+    },
+  };
+}
+
+/** Toast singkat untuk feedback aksi (SUCCESS / WARNING / ERROR). */
 export function showToast(message, variant = 'success') {
   const previous = document.querySelector('.toast');
   if (previous) previous.remove();
@@ -520,6 +846,26 @@ export function showToast(message, variant = 'success') {
   toast.setAttribute('role', 'status');
   document.body.appendChild(toast);
   window.setTimeout(() => toast.remove(), 3000);
+}
+
+/** Banner persisten untuk data rusak / storage mati / error import (M6). */
+export function showBanner(message, tone = 'warning') {
+  const host = document.querySelector('.banner-host');
+  if (!host) return;
+  host.replaceChildren();
+  const banner = createEl('div', `banner banner--${tone}`);
+  banner.setAttribute('role', 'alert');
+  const close = createEl('button', 'banner-close', '✕');
+  close.type = 'button';
+  close.setAttribute('aria-label', 'Tutup pemberitahuan');
+  close.addEventListener('click', hideBanner);
+  append(banner, bannerIcon(), createEl('p', 'banner-text', message), close);
+  host.appendChild(banner);
+}
+
+export function hideBanner() {
+  const host = document.querySelector('.banner-host');
+  if (host) host.replaceChildren();
 }
 
 /* ------------------------------------------------------------
@@ -845,17 +1191,262 @@ export function openDetailModal(product, trigger, onSimulate) {
 export function closeDetailModal() {
   if (!detailModal || detailModal.overlay.hidden) return;
   detailModal.overlay.hidden = true;
-  document.body.classList.remove('modal-open');
+  syncBodyModal();
   if (modalTrigger && modalTrigger.isConnected) modalTrigger.focus();
   modalTrigger = null;
   modalOnSimulate = null;
   if (detailModal) detailModal.product = null;
 }
 
-/** Pasang handler Esc sekali (dipanggil dari main.js). */
+/* ------------------------------------------------------------
+   Modal form Tambah/Edit kostum (M5)
+   ------------------------------------------------------------ */
+
+let formModal = null;
+let formTrigger = null;
+let formOnSave = null;
+
+function syncBodyModal() {
+  const detailOpen = detailModal && !detailModal.overlay.hidden;
+  const formOpen = formModal && !formModal.overlay.hidden;
+  document.body.classList.toggle('modal-open', Boolean(detailOpen || formOpen));
+}
+
+function registerFormField(grid, fields, key, labelText, control, full = false) {
+  const wrap = createEl('div', `form-field${full ? ' form-field--full' : ''}`);
+  if (!control.id) control.id = `form-${key}`;
+  const label = createEl('label', 'label', labelText);
+  label.htmlFor = control.id;
+  const error = createEl('p', 'form-error label', '');
+  error.id = `form-${key}-error`;
+  error.hidden = true;
+  control.setAttribute('aria-describedby', error.id);
+  append(wrap, label, control, error);
+  grid.appendChild(wrap);
+  fields[key] = { wrap, control, error };
+  return control;
+}
+
+function buildFormModal() {
+  const overlay = createEl('div', 'modal-overlay');
+  overlay.hidden = true;
+  overlay.dataset.modal = 'form';
+
+  const panel = createEl('div', 'modal-panel form-panel');
+  panel.setAttribute('role', 'dialog');
+  panel.setAttribute('aria-modal', 'true');
+  panel.setAttribute('aria-labelledby', 'form-modal-title');
+
+  const header = createEl('header', 'modal-header');
+  const title = createEl('h2', 'display modal-title', 'TAMBAH KOSTUM');
+  title.id = 'form-modal-title';
+  const close = createEl('button', 'modal-close', '✕');
+  close.type = 'button';
+  close.setAttribute('aria-label', 'Tutup form kostum');
+  append(header, title, close);
+
+  const form = createEl('form', 'form-body');
+  form.noValidate = true;
+  const grid = createEl('div', 'form-grid');
+  const fields = {};
+
+  const nama = createEl('input', 'form-input');
+  nama.type = 'text';
+  nama.autocomplete = 'off';
+  registerFormField(grid, fields, 'nama', 'NAMA KOSTUM / KARAKTER', nama);
+
+  const asal = createEl('input', 'form-input');
+  asal.type = 'text';
+  asal.autocomplete = 'off';
+  registerFormField(grid, fields, 'asal', 'ASAL SERIES', asal);
+
+  const kategori = createEl('select', 'form-input form-select');
+  KATEGORI.forEach((value) => {
+    const option = createEl('option', null, value);
+    option.value = value;
+    kategori.appendChild(option);
+  });
+  registerFormField(grid, fields, 'kategori', 'KATEGORI', kategori);
+
+  const ukuran = createEl('select', 'form-input form-select');
+  UKURAN.forEach((value) => {
+    const option = createEl('option', null, value);
+    option.value = value;
+    ukuran.appendChild(option);
+  });
+  registerFormField(grid, fields, 'ukuran', 'UKURAN', ukuran);
+
+  const harga = createEl('input', 'form-input');
+  harga.type = 'number';
+  harga.min = '0';
+  harga.step = '1';
+  registerFormField(grid, fields, 'hargaPer2Hari', 'HARGA / 2 HARI (RP)', harga);
+
+  const stok = createEl('input', 'form-input');
+  stok.type = 'number';
+  stok.min = '0';
+  stok.step = '1';
+  registerFormField(grid, fields, 'stok', 'STOK', stok);
+
+  const status = createEl('select', 'form-input form-select');
+  STATUS.forEach((value) => {
+    const option = createEl('option', null, value);
+    option.value = value;
+    status.appendChild(option);
+  });
+  registerFormField(grid, fields, 'status', 'STATUS', status);
+
+  const imageUrl = createEl('input', 'form-input');
+  imageUrl.type = 'text';
+  imageUrl.placeholder = '/images/placeholder.svg';
+  registerFormField(grid, fields, 'imageUrl', 'PATH GAMBAR (OPSIONAL)', imageUrl);
+
+  const deskripsi = createEl('textarea', 'form-input form-textarea');
+  deskripsi.rows = 3;
+  registerFormField(grid, fields, 'deskripsi', 'KELENGKAPAN KOSTUM (OPSIONAL)', deskripsi, true);
+
+  const unggulan = createEl('input', 'form-check-input');
+  unggulan.type = 'checkbox';
+  unggulan.id = 'form-unggulan';
+  unggulan.name = 'unggulan';
+  const checkLabel = createEl('label', 'form-check form-field--full');
+  checkLabel.htmlFor = unggulan.id;
+  const checkError = createEl('p', 'form-error label', '');
+  checkError.id = 'form-unggulan-error';
+  checkError.hidden = true;
+  unggulan.setAttribute('aria-describedby', checkError.id);
+  append(checkLabel, unggulan, createEl('span', 'label', 'TANDAI SEBAGAI KOSTUM UNGGULAN'), checkError);
+  grid.appendChild(checkLabel);
+  fields.unggulan = { wrap: checkLabel, control: unggulan, error: checkError };
+
+  const actions = createEl('div', 'form-actions');
+  const batal = createEl('button', 'btn btn-cancel', 'BATAL');
+  batal.type = 'button';
+  const simpan = createEl('button', 'btn btn-primary', 'SIMPAN');
+  simpan.type = 'submit';
+  append(actions, batal, simpan);
+  append(form, grid, actions);
+  append(panel, header, form);
+  overlay.appendChild(panel);
+  document.body.appendChild(overlay);
+
+  const refs = { overlay, panel, title, close, form, fields };
+  form.addEventListener('submit', handleFormSubmit);
+  close.addEventListener('click', closeProductFormModal);
+  overlay.addEventListener('click', (event) => {
+    if (event.target === overlay) closeProductFormModal();
+  });
+
+  formModal = refs;
+  return refs;
+}
+
+function applyFormErrors(errors = {}) {
+  if (!formModal) return;
+  Object.entries(formModal.fields).forEach(([key, field]) => {
+    const message = errors[key] || '';
+    field.error.textContent = message;
+    field.error.hidden = !message;
+    field.wrap.classList.toggle('has-error', Boolean(message));
+    if (message) field.control.setAttribute('aria-invalid', 'true');
+    else field.control.removeAttribute('aria-invalid');
+  });
+}
+
+function collectFormDraft() {
+  const field = formModal.fields;
+  return {
+    nama: field.nama.control.value,
+    asal: field.asal.control.value,
+    kategori: field.kategori.control.value,
+    ukuran: field.ukuran.control.value,
+    hargaPer2Hari: field.hargaPer2Hari.control.value,
+    stok: field.stok.control.value,
+    status: field.status.control.value,
+    imageUrl: field.imageUrl.control.value,
+    deskripsi: field.deskripsi.control.value,
+    unggulan: field.unggulan.control.checked,
+  };
+}
+
+function handleFormSubmit(event) {
+  event.preventDefault();
+  if (!formModal) return;
+
+  const result = validateProductDraft(collectFormDraft());
+  applyFormErrors(result.errors);
+  const errorKeys = Object.keys(result.errors);
+  if (errorKeys.length > 0) {
+    const first = formModal.fields[errorKeys[0]];
+    if (first) first.control.focus();
+    showToast('GAGAL MENYIMPAN. PERIKSA KEMBALI ISIAN FORM.', 'error');
+    return;
+  }
+
+  const id = formModal.editId;
+  const onSave = formOnSave;
+  closeProductFormModal();
+  if (typeof onSave === 'function') onSave(result.values, id);
+}
+
+/** Buka form Tambah (product=null) atau Edit; `trigger` untuk focus return. */
+export function openProductForm(product, trigger, onSave) {
+  if (!formModal) buildFormModal();
+  formTrigger = trigger ?? null;
+  formOnSave = typeof onSave === 'function' ? onSave : null;
+  formModal.editId = product?.id ?? null;
+  formModal.title.textContent = product ? 'EDIT KOSTUM' : 'TAMBAH KOSTUM';
+
+  const source = product ?? {
+    nama: '',
+    asal: '',
+    kategori: KATEGORI[0],
+    ukuran: UKURAN[0],
+    hargaPer2Hari: 100000,
+    stok: 0,
+    status: STATUS[0],
+    imageUrl: '',
+    deskripsi: '',
+    unggulan: false,
+  };
+  const field = formModal.fields;
+  field.nama.control.value = source.nama ?? '';
+  field.asal.control.value = source.asal ?? '';
+  field.kategori.control.value = source.kategori ?? KATEGORI[0];
+  field.ukuran.control.value = source.ukuran ?? UKURAN[0];
+  field.hargaPer2Hari.control.value = String(source.hargaPer2Hari ?? 100000);
+  field.stok.control.value = String(source.stok ?? 0);
+  field.status.control.value = source.status ?? STATUS[0];
+  field.imageUrl.control.value = source.imageUrl ?? '';
+  field.deskripsi.control.value = source.deskripsi ?? '';
+  field.unggulan.control.checked = Boolean(source.unggulan);
+  applyFormErrors({});
+
+  formModal.overlay.hidden = false;
+  syncBodyModal();
+  field.nama.control.focus();
+}
+
+export function closeProductFormModal() {
+  if (!formModal || formModal.overlay.hidden) return;
+  formModal.overlay.hidden = true;
+  syncBodyModal();
+  if (formTrigger && formTrigger.isConnected) formTrigger.focus();
+  formTrigger = null;
+  formOnSave = null;
+  formModal.editId = null;
+}
+
+/** Pasang handler Esc sekali (dipanggil dari main.js); form lebih prioritas. */
 export function bindModalKeyboard() {
   document.addEventListener('keydown', (event) => {
-    if (event.key === 'Escape' && detailModal && !detailModal.overlay.hidden) {
+    if (event.key !== 'Escape') return;
+    if (formModal && !formModal.overlay.hidden) {
+      event.preventDefault();
+      closeProductFormModal();
+      return;
+    }
+    if (detailModal && !detailModal.overlay.hidden) {
       event.preventDefault();
       closeDetailModal();
     }

@@ -1,21 +1,100 @@
 /**
- * store.js — State management ringan + helper localStorage.
- * Milestone 1: kerangka. Semua akses localStorage dibungkus try/catch
- * sesuai SPEC.md R1 / NFR4 (fallback in-memory saat storage gagal).
+ * store.js — State management + persistensi localStorage (M6).
+ * Semua akses localStorage dibungkus try/catch sesuai SPEC.md R1 / NFR4.
+ * Mutasi kostum selalu lewat satu fungsi `commit()` agar tidak ada yang
+ * terlewat dari penyimpanan (T6.3).
  */
-import { FILTER_DEFAULT, PRODUK_SEED, filterProducts } from './products.js';
+import {
+  FILTER_DEFAULT,
+  KATEGORI,
+  PRODUK_SEED,
+  STATUS,
+  UKURAN,
+  filterProducts,
+} from './products.js';
 
-const STORAGE_KEY = 'costestant.kostum.v1';
+/** Key kanonik M6. Key lama M1–M5 tetap dibaca sekali untuk migrasi. */
+export const STORAGE_KEY = 'costestant:costumes:v1';
+const LEGACY_KEY = 'costestant.kostum.v1';
 const META_KEY = 'costestant.meta.v1';
+
+const STORAGE_WARNING =
+  'PENYIMPANAN LOKAL TIDAK TERSEDIA; PERUBAHAN HANYA SESI INI.';
 
 let products = cloneSeed();
 let criteria = { ...FILTER_DEFAULT };
 let storageAvailable = true;
+let lastIssue = null;
 const listeners = new Set();
 
 function cloneSeed() {
   return PRODUK_SEED.map((item) => ({ ...item }));
 }
+
+/* ------------------------------------------------------------------
+   Validasi skema (M6) — satu source of truth untuk load & import
+   ------------------------------------------------------------------ */
+
+/** Kumpulan pesan error untuk satu item; dipakai validator & pesan import. */
+function itemErrors(item, prefix = '') {
+  if (!item || typeof item !== 'object' || Array.isArray(item)) {
+    return [`${prefix}DATA BUKAN OBJEK.`];
+  }
+  const errors = [];
+  const push = (field, detail) => errors.push(`${prefix}${field}: ${detail}.`);
+
+  if (typeof item.id !== 'string' || item.id.trim() === '') push('id', 'STRING TIDAK KOSONG');
+  if (typeof item.nama !== 'string' || item.nama.trim() === '') push('nama', 'STRING TIDAK KOSONG');
+  if (typeof item.asal !== 'string' || item.asal.trim() === '') push('asal', 'STRING TIDAK KOSONG');
+  if (!KATEGORI.includes(item.kategori)) push('kategori', 'ENUM TIDAK VALID');
+  if (!UKURAN.includes(item.ukuran)) push('ukuran', 'ENUM TIDAK VALID');
+  if (
+    typeof item.hargaPer2Hari !== 'number' ||
+    Number.isNaN(item.hargaPer2Hari) ||
+    !Number.isFinite(item.hargaPer2Hari) ||
+    item.hargaPer2Hari < 0
+  ) {
+    push('hargaPer2Hari', 'NUMBER VALID ≥ 0');
+  }
+  if (!Number.isInteger(item.stok) || item.stok < 0) push('stok', 'INTEGER ≥ 0');
+  if (!STATUS.includes(item.status)) push('status', 'ENUM TIDAK VALID');
+  if (typeof item.deskripsi !== 'string') push('deskripsi', 'HARUS STRING');
+  if (typeof item.imageUrl !== 'string') push('imageUrl', 'HARUS STRING');
+  if (typeof item.unggulan !== 'boolean') push('unggulan', 'HARUS BOOLEAN');
+  return errors;
+}
+
+/** Validator satu kostum — true hanya jika seluruh field wajib lolos. */
+export function validateCostumeItem(item) {
+  return itemErrors(item).length === 0;
+}
+
+/** Validasi seluruh array + pesan spesifik (untuk banner import). */
+export function validateCostumeListDetailed(list) {
+  if (!Array.isArray(list)) return { valid: false, errors: ['DATA BUKAN ARRAY.'] };
+  if (list.length === 0) return { valid: false, errors: ['ARRAY KOSTUM KOSONG.'] };
+
+  const errors = [];
+  const seen = new Set();
+  list.forEach((item, index) => {
+    const prefix = `ITEM ${index + 1} — `;
+    errors.push(...itemErrors(item, prefix));
+    if (item && typeof item === 'object' && typeof item.id === 'string') {
+      if (seen.has(item.id)) errors.push(`${prefix}id: DUPLIKAT.`);
+      seen.add(item.id);
+    }
+  });
+  return { valid: errors.length === 0, errors };
+}
+
+/** Validator array kostum — true jika array non-kosong & semua item valid. */
+export function validateCostumeList(list) {
+  return validateCostumeListDetailed(list).valid;
+}
+
+/* ------------------------------------------------------------------
+   localStorage: baca / tulis / pulihkan
+   ------------------------------------------------------------------ */
 
 function hasStorage() {
   try {
@@ -37,7 +116,49 @@ function writeMeta() {
     );
   } catch {
     storageAvailable = false;
+    lastIssue = { kind: 'unavailable', message: STORAGE_WARNING };
   }
+}
+
+function persist() {
+  if (!storageAvailable) return false;
+  try {
+    window.localStorage.setItem(STORAGE_KEY, JSON.stringify(products));
+    return true;
+  } catch {
+    storageAvailable = false;
+    lastIssue = { kind: 'unavailable', message: STORAGE_WARNING };
+    return false;
+  }
+}
+
+/** Baca key baru; bila belum ada, coba key lama untuk migrasi sekali jalan. */
+function readRaw() {
+  let raw = null;
+  let usedLegacy = false;
+  try {
+    raw = window.localStorage.getItem(STORAGE_KEY);
+  } catch {
+    storageAvailable = false;
+    return { raw: null, usedLegacy: false };
+  }
+  if (raw) return { raw, usedLegacy: false };
+
+  try {
+    raw = window.localStorage.getItem(LEGACY_KEY);
+    usedLegacy = Boolean(raw);
+  } catch {
+    storageAvailable = false;
+  }
+  return { raw, usedLegacy };
+}
+
+function recover(message) {
+  products = cloneSeed();
+  persist();
+  writeMeta();
+  lastIssue = { kind: 'corrupt', message };
+  return { products, issue: lastIssue };
 }
 
 function notify() {
@@ -50,39 +171,54 @@ function notify() {
   });
 }
 
-/** Muat data dari localStorage; auto-reseed bila kosong/rusak/bukan array. */
+/**
+ * Muat data saat aplikasi dibuka. Mengembalikan `{ products, issue }`.
+ * JSON rusak / skema invalid / array kosong → banner + auto-reseed 8 data.
+ */
 export function initStore() {
   storageAvailable = hasStorage();
+  lastIssue = null;
+
   if (!storageAvailable) {
     products = cloneSeed();
-    return products;
+    lastIssue = { kind: 'unavailable', message: STORAGE_WARNING };
+    return { products, issue: lastIssue };
   }
 
-  try {
-    const raw = window.localStorage.getItem(STORAGE_KEY);
-    if (!raw) {
-      products = cloneSeed();
-      window.localStorage.setItem(STORAGE_KEY, JSON.stringify(products));
-      writeMeta();
-      return products;
-    }
-
-    const parsed = JSON.parse(raw);
-    if (!Array.isArray(parsed) || parsed.length === 0) {
-      throw new Error('Data kostum tidak valid');
-    }
-    products = parsed;
-    return products;
-  } catch {
+  const { raw, usedLegacy } = readRaw();
+  if (!storageAvailable) {
     products = cloneSeed();
-    try {
-      window.localStorage.setItem(STORAGE_KEY, JSON.stringify(products));
-    } catch {
-      storageAvailable = false;
-    }
-    writeMeta();
-    return products;
+    lastIssue = { kind: 'unavailable', message: STORAGE_WARNING };
+    return { products, issue: lastIssue };
   }
+
+  if (!raw) {
+    products = cloneSeed();
+    persist();
+    writeMeta();
+    return { products, issue: null };
+  }
+
+  let parsed = null;
+  try {
+    parsed = JSON.parse(raw);
+  } catch {
+    return recover(
+      'DATA PENYIMPANAN RUSAK (JSON TIDAK VALID). KATALOG DIKEMBALIKAN KE 8 DATA CONTOH.',
+    );
+  }
+
+  const check = validateCostumeListDetailed(parsed);
+  if (!check.valid) {
+    const detail = check.errors.slice(0, 2).join(' ');
+    return recover(
+      `DATA PENYIMPANAN TIDAK SESUAI SKEMA. KATALOG DIKEMBALIKAN KE 8 DATA CONTOH. ${detail}`,
+    );
+  }
+
+  products = parsed.map((item) => ({ ...item }));
+  if (usedLegacy) persist(); // migrasi ke key kanonik M6
+  return { products, issue: null };
 }
 
 export function getProducts() {
@@ -91,6 +227,10 @@ export function getProducts() {
 
 export function getStorageStatus() {
   return storageAvailable;
+}
+
+export function getStorageIssue() {
+  return lastIssue;
 }
 
 /* ---- State pencarian/filter/sort (satu source of truth) ---- */
@@ -121,46 +261,88 @@ export function subscribe(listener) {
   return () => listeners.delete(listener);
 }
 
-/** Simpan array ke state + localStorage, lalu beri tahu subscriber. */
-export function saveProducts(next) {
-  if (Array.isArray(next)) products = next;
-  if (storageAvailable) {
-    try {
-      window.localStorage.setItem(STORAGE_KEY, JSON.stringify(products));
-    } catch {
-      storageAvailable = false;
-    }
-  }
+/** Satu jalur commit untuk semua mutasi: tulis localStorage lalu render. */
+function commit(next) {
+  products = next;
+  persist();
   notify();
   return storageAvailable;
 }
 
-/** Kembalikan seluruh katalog ke 8 data awal. */
+export function saveProducts(next) {
+  return commit(Array.isArray(next) ? next : products);
+}
+
+/** Kembalikan seluruh katalog ke 8 data awal + perbarui meta. */
 export function resetProducts() {
-  products = cloneSeed();
-  if (storageAvailable) {
-    try {
-      window.localStorage.setItem(STORAGE_KEY, JSON.stringify(products));
-      writeMeta();
-    } catch {
-      storageAvailable = false;
-    }
-  }
-  notify();
+  commit(cloneSeed());
+  writeMeta();
   return products;
 }
 
-/* Helper mutasi kerangka untuk milestone berikutnya. */
+/* ------------------------------------------------------------------
+   Mutasi dashboard pengelola (M5) — semuanya lewat commit()
+   ------------------------------------------------------------------ */
+
+/** UUID v4 + fallback (SPEC.md NFR9 / R10). Id dibuat di store, bukan di form. */
+export function createProductId() {
+  const cryptoApi = typeof globalThis !== 'undefined' ? globalThis.crypto : null;
+  if (cryptoApi && typeof cryptoApi.randomUUID === 'function') return cryptoApi.randomUUID();
+  return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, (char) => {
+    const random = Math.floor(Math.random() * 16);
+    const value = char === 'x' ? random : (random & 0x3) | 0x8;
+    return value.toString(16);
+  });
+}
+
+export function getProductById(id) {
+  return products.find((item) => item.id === id) ?? null;
+}
+
+/** Tambah kostum; `id` otomatis bila belum ada. */
 export function addProduct(item) {
-  return saveProducts([...products, item]);
+  const product = { ...(item ?? {}) };
+  if (!product.id) product.id = createProductId();
+  return commit([...products, product]);
 }
 
 export function updateProduct(id, patch) {
-  return saveProducts(products.map((item) => (item.id === id ? { ...item, ...patch } : item)));
+  return commit(products.map((item) => (item.id === id ? { ...item, ...patch } : item)));
 }
 
 export function deleteProduct(id) {
-  return saveProducts(products.filter((item) => item.id !== id));
+  return commit(products.filter((item) => item.id !== id));
+}
+
+/* ------------------------------------------------------------------
+   Export / Import JSON (M6)
+   ------------------------------------------------------------------ */
+
+/** String JSON rapi untuk diunduh sebagai cadangan. */
+export function exportProductsJson() {
+  return JSON.stringify(products, null, 2);
+}
+
+/**
+ * Parsing + validasi + commit dari teks file JSON.
+ * Tidak menulis state sama sekali ketika validasi gagal.
+ */
+export function importProductsJson(raw) {
+  let parsed = null;
+  try {
+    parsed = JSON.parse(String(raw ?? '').replace(/^\uFEFF/, ''));
+  } catch {
+    return { ok: false, error: 'GAGAL IMPORT: ISI FILE BUKAN JSON YANG VALID.' };
+  }
+
+  const check = validateCostumeListDetailed(parsed);
+  if (!check.valid) {
+    const detail = check.errors.slice(0, 3).join(' ');
+    return { ok: false, error: `GAGAL IMPORT: ${detail}` };
+  }
+
+  commit(parsed.map((item) => ({ ...item })));
+  return { ok: true, count: parsed.length };
 }
 
 /** Rumus statistik SPEC.md 4.3. */

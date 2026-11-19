@@ -193,32 +193,38 @@
 **Gate masuk:** AC C & D lolos.
 **Gate keluar:** AC E1–E7 lolos secara in-memory (poin "setelah refresh" menyusul di M6).
 
-- [ ] **T5.1 — Daftar manajemen kostum (tabel + card-list)**
+> **Catatan implementasi (M5):**
+> 1. Instruksi "belum menambahkan persistensi localStorage" dipatuhi dalam arti **tidak menambah modul/logik storage baru**. Kode scaffold M1 sudah memuat `localStorage` di `src/store.js` (`initStore`/`saveProducts`/`resetProducts`) dan M4 memakainya untuk simulasi sewa, jadi perilaku itu dibiarkan utuh; M6 akan merapikan storage secara khusus.
+> 2. Nama seed memakai kostum **fiktif M2** (`Luna Silver`, `Blaze Runner`, `Captain Nova`, `Iron Warden`, `Mecha Aurora`, `Ultra Vanguard`, `Crimson Rider`, `Starlight Wanderer`) menggantikan nama di tabel 4.6/T5.x. Komposisi tetap **8 / 17 / 1** dan perilaku E5/E7 tetap diuji dengan `Mecha Aurora` (Perawatan, stok 0) serta `Captain Nova` (Disewa).
+> 3. `deskripsi` dan `unggulan` diperlakukan **opsional di form**: jika deskripsi dikosongkan, sistem mengisi kalimat default 10–500 karakter agar data model `SPEC.md` 4.1 tetap lengkap; jika diisi tapi < 10 karakter tetap ditolak sesuai 4.2. `imageUrl` kosong → `/images/placeholder.svg`; path nons lokal ditolak.
+> 4. Semua helper ditempatkan di empat berkas yang diizinkan: validasi murni `validateProductDraft()` dan modal form di `src/ui.js`; `createProductId()` (UUID + fallback) serta mutasi di `src/store.js`; delegasi event di `src/main.js`; gaya di `src/style.css`. Tidak ada modul `utils.js` / `src/ui/dashboard.js` baru.
+
+- [x] **T5.1 — Daftar manajemen kostum (tabel + card-list)**
   - **Deskripsi:** Render tabel per `UI-SPEC.md` 4.3 (header hitam-teks kuning, zebra, kolom KOSTUM/KATEGORI/UKURAN/HARGA/STOK/STATUS/AKSI) dan card-list di `< lg`.
   - **AC (manual browser):** 8 baris tampil dengan harga `RP … / 2 HARI`; di 1280px tabel rapi; di 375px berubah menjadi 8 kartu dengan tombol `EDIT` / `HAPUS`; tidak ada horizontal scroll di luar wrapper tabel.
   - **File:** `src/ui/dashboard.js`, `src/styles.css`
 
-- [ ] **T5.2 — Modal form Tambah & Edit kostum**
+- [x] **T5.2 — Modal form Tambah & Edit kostum**
   - **Deskripsi:** Modal 2 kolom di `≥ md` dengan 10 field data model; `id` tidak ditampilkan; Tambah → `crypto.randomUUID()` (fallback di `utils.js`), `unggulan` default false; Edit → terisi data lama dan id immutable.
   - **AC (manual browser):** Klik `+ TAMBAH KOSTUM` → form kosong, pilihan kategori/ukuran/status sesuai enum; klik `EDIT` pada Naruto → field terisi `Naruto Uzumaki`, `125000`; tombol `BATAL` menutup tanpa perubahan.
   - **File:** `src/ui/dashboard.js`, `src/ui/components.js`, `src/utils.js`
 
-- [ ] **T5.3 — Validasi form inline**
+- [x] **T5.3 — Validasi form inline**
   - **Deskripsi:** Terapkan aturan `SPEC.md` 4.2: trim + panjang teks, enum, angka bulat `>= 0`, `imageUrl` kosong → placeholder; error merah per field + fokus ke field pertama error; gagal → jangan tulis state.
   - **AC (manual browser):** **E3** lolos: harga negatif / stok `2.5` / nama 2 karakter ditolak, pesan error muncul tepat di bawah field terkait, fokus berpindah ke field itu, jumlah kartu tetap 8.
   - **File:** `src/ui/dashboard.js`, `src/utils.js`
 
-- [ ] **T5.4 — Ubah status cepat**
+- [x] **T5.4 — Ubah status cepat**
   - **Deskripsi:** `<select>` status di tiap baris/kartu; perubahan langsung update state & render ulang katalog + statistik; **stok tidak diubah otomatis** pada jalur manual (aturan 4.3 jalur 1).
   - **AC (manual browser):** **E5** lolos: ubah Samus `Perawatan → Tersedia` → badge katalog jadi emerald, angka unit tersedia tetap **17** (stok 0); ubah Naruto ke `Sedang Disewa` → angka "Sedang Disewa" jadi 2 dan unit tersedia turun 2.
   - **File:** `src/ui/dashboard.js`, `src/state.js`, `src/main.js`
 
-- [ ] **T5.5 — Hapus kostum dengan konfirmasi**
+- [x] **T5.5 — Hapus kostum dengan konfirmasi**
   - **Deskripsi:** Tombol `HAPUS` → `window.confirm('HAPUS KOSTUM INI? TINDAKAN INI TIDAK DAPAT DIBATALKAN.')`; Batal = no-op, OK = hapus dari state + render ulang.
   - **AC (manual browser):** **E6** lolos: klik Hapus → dialog muncul; pilih **Batal** → 8 kartu tetap; ulangi pilih **OK** → kostum hilang, total katalog jadi 7, statistik berkurang.
   - **File:** `src/ui/dashboard.js`, `src/state.js`
 
-- [ ] **T5.6 — Tombol `RESET DATA DUMMY` + konfirmasi**
+- [x] **T5.6 — Tombol `RESET DATA DUMMY` + konfirmasi**
   - **Deskripsi:** Tombol hitam-teks kuning dengan stripe merah; klik → `window.confirm`; OK → timpa state dengan 8 seed persis tabel 4.6, render ulang katalog + dashboard.
   - **AC (manual browser):** **E7 (tanpa refresh)** lolos: setelah hapus/edit, klik Reset → OK → tepat 8 kostum dengan Sailor Moon stok 3 Tersedia, Luffy Disewa, Samus Perawatan; angka kembali 8 / 17 / 1.
   - **File:** `src/ui/dashboard.js`, `src/data/seed.js`, `src/state.js`
@@ -231,27 +237,34 @@
 **Gate masuk:** CRUD berfungsi in-memory.
 **Gate keluar:** Refresh berkali-kali tidak mengubah data; AC E2/E4/E7 penuh & F4 lolos.
 
-- [ ] **T6.1 — Modul `storage.js` (load/save/reset)**
+> **Catatan implementasi (M6):**
+> 1. Sesuai instruksi M6, key kanonik harus **`costestant:costumes:v1`** (bukan `costestant.kostum.v1` seperti di daftar tugas/4.7). `src/store.js` memakai key baru untuk baca/tulis; key lama M1–M5 tetap dibaca **sekali** sebagai migrasi bila key baru belum ada, lalu ditulis ke key baru. Key meta `costestant.meta.v1` dipertahankan.
+> 2. Tidak ada modul baru (`src/storage.js` / `src/state.js` / `src/data/seed.js`) sesuai batasan file M6: load/save/reset, `validateCostumeItem()`, `validateCostumeList()`, `validateCostumeListDetailed()`, `exportProductsJson()`, dan `importProductsJson()` semuanya diekspor dari **`src/store.js`**. Semua mutasi (CRUD, status cepat, simulasi sewa, reset, import) lewat satu `commit()`.
+> 3. Peraturan user lebih spesifik dari 4.1 untuk `hargaPer2Hari` (cukup `typeof === 'number' && !NaN && >= 0`), jadi validator storage memakai aturan itu (ditambah `Number.isFinite` sebagai pengaman); batas atas 100.000.000 tetap dijaga form `validateProductDraft()`. `id` duplikat dan array kosong ditolak — array kosong dianggap data rusak → auto-reseed 8 kostum (T6.2), sehingga impor `[]` juga ditolak dengan pesan spesifik.
+> 4. Data rusak (JSON gagal di-`parse` / skema invalid / array kosong) → **banner merah persisten** di atas panel utama + auto-reseed 8 seed fiktif M2. Storage gagal (private mode/kuota) → banner kuning + toast kuning sekali per sesi; state tetap in-memory (F4). Semua teks banner/error/toast ditulis dengan `textContent`.
+> 5. Toolbar `DATA & CADANGAN` di bagian atas dashboard berisi `EXPORT JSON` (Blob + `URL.createObjectURL`, nama `costestant-backup.json`), `IMPORT JSON` (`<input type="file" accept=".json">`, parsing `try/catch`, validasi per item, error menyebut `ITEM n — field: alasan`), dan `RESET DATA DUMMY` (tetap lewat `window.confirm`). Nama seed memakai kostum fiktif M2 seperti keputusan M5.
+
+- [x] **T6.1 — Modul `storage.js` (load/save/reset)**
   - **Deskripsi:** Buat `loadKostum()`, `saveKostum(arr)`, `resetKostum()` dengan key `costestant.kostum.v1`; baca/tulis selalu di `try/catch`.
   - **AC (manual browser):** DevTools → Application → Local Storage → `costestant.kostum.v1` muncul setelah pertama buka; isinya array JSON berisi 8 objek dengan field lengkap sesuai `SPEC.md` 4.1.
   - **File:** `src/storage.js` (baru), `src/main.js`
 
-- [ ] **T6.2 — Inisialisasi awal & auto-reseed data rusak**
+- [x] **T6.2 — Inisialisasi awal & auto-reseed data rusak**
   - **Deskripsi:** Saat load: key belum ada / JSON invalid / bukan array / array kosong → tulis seed; valid → pakai data tersebut.
   - **AC (manual browser):** Ubah nilai key di DevTools menjadi `bukan-json`, lalu hard refresh → katalog kembali 8 kartu, Console **tidak ada error**, key otomatis berisi seed lagi.
   - **File:** `src/storage.js`, `src/data/seed.js`, `src/main.js`
 
-- [ ] **T6.3 — Sinkronisasi semua mutasi ke localStorage**
+- [x] **T6.3 — Sinkronisasi semua mutasi ke localStorage**
   - **Deskripsi:** Tambah/edit/hapus/ubah status/simulasi sewa/reset memanggil `saveKostum()` lalu render ulang; satu fungsi `commit()` di state dipakai semua modul agar tidak ada yang terlewat.
   - **AC (manual browser):** **E2 penuh, E4 penuh, E7 penuh** lolos: tambah kostum → 9 kartu, refresh → tetap 9; edit harga Naruto → 150000, refresh → tetap; reset → 8 seed, refresh → tetap 8; simulasi sewa Sailor Moon stok 3→2, refresh → tetap 2.
   - **File:** `src/state.js`, `src/storage.js`, `src/main.js`, `src/ui/dashboard.js`, `src/ui/detailModal.js`
 
-- [ ] **T6.4 — Meta key & fallback localStorage gagal**
+- [x] **T6.4 — Meta key & fallback localStorage gagal**
   - **Deskripsi:** Tulis `costestant.meta.v1 = { version: 1, lastReset: <ISO> }`; jika akses storage gagal (private mode / kuota penuh), tetap pakai data in-memory dan munculkan toast peringatan kuning.
   - **AC (manual browser):** **F4** lolos: buka di mode privat / blokir storage → aplikasi tidak crash, toast `PENYIMPANAN LOKAL TIDAK TERSEDIA; PERUBAHAN HANYA SESI INI.` muncul, CRUD masih bisa dipakai selama sesi; Console bersih.
   - **File:** `src/storage.js`, `src/ui/components.js`, `src/main.js`
 
-- [ ] **T6.5 — Statistik & stock chip dari data tersimpan**
+- [x] **T6.5 — Statistik & stock chip dari data tersimpan**
   - **Deskripsi:** Pastikan 3 kartu statistik dan chip navbar dihitung ulang dari state hasil load storage, bukan dari seed statis.
   - **AC (manual browser):** **E1 penuh** lolos: setelah ubah status Samus → Tersedia lalu refresh, chip navbar & kartu statistik tetap konsisten dengan data tersimpan; pada seed murni kembali menampilkan **8 / 17 / 1**.
   - **File:** `src/ui/dashboard.js`, `src/ui/layout.js`, `src/main.js`
