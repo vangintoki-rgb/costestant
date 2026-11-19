@@ -5,12 +5,16 @@
  * terlewat dari penyimpanan (T6.3).
  */
 import {
+  BATAS_SKEMA,
   FILTER_DEFAULT,
+  ID_PATTERN,
   KATEGORI,
   PRODUK_SEED,
   STATUS,
   UKURAN,
   filterProducts,
+  isValidImagePath,
+  normalisasiImagePath,
 } from './products.js';
 
 /** Key kanonik M6. Key lama M1–M5 tetap dibaca sekali untuk migrasi. */
@@ -20,6 +24,26 @@ const META_KEY = 'costestant.meta.v1';
 
 const STORAGE_WARNING =
   'PENYIMPANAN LOKAL TIDAK TERSEDIA; PERUBAHAN HANYA SESI INI.';
+
+/** Audit C-03: batas ukuran payload & jumlah kostum. */
+export const MAX_IMPORT_BYTES = 1_000_000;
+const MAX_PAYLOAD_CHARS = 1_000_000;
+const MAX_LIST_ITEMS = 500;
+
+/** Audit C-04/P-01: hanya field skema yang boleh masuk state. */
+const ALLOWED_KEYS = new Set([
+  'id',
+  'nama',
+  'asal',
+  'kategori',
+  'ukuran',
+  'hargaPer2Hari',
+  'stok',
+  'status',
+  'deskripsi',
+  'imageUrl',
+  'unggulan',
+]);
 
 let products = cloneSeed();
 let criteria = { ...FILTER_DEFAULT };
@@ -43,25 +67,64 @@ function itemErrors(item, prefix = '') {
   const errors = [];
   const push = (field, detail) => errors.push(`${prefix}${field}: ${detail}.`);
 
-  if (typeof item.id !== 'string' || item.id.trim() === '') push('id', 'STRING TIDAK KOSONG');
-  if (typeof item.nama !== 'string' || item.nama.trim() === '') push('nama', 'STRING TIDAK KOSONG');
-  if (typeof item.asal !== 'string' || item.asal.trim() === '') push('asal', 'STRING TIDAK KOSONG');
+  // Audit C-04/P-01: kunci asing (termasuk __proto__/constructor/prototype) ditolak.
+  if (Object.keys(item).some((key) => !ALLOWED_KEYS.has(key))) {
+    errors.push(`${prefix}KUNCI OBJEK TIDAK DIIZINKAN.`);
+  }
+
+  const trimmed = (key) => (typeof item[key] === 'string' ? item[key].trim() : '');
+  const id = trimmed('id');
+  const nama = trimmed('nama');
+  const asal = trimmed('asal');
+  const deskripsi = trimmed('deskripsi');
+
+  if (!ID_PATTERN.test(id)) push('id', 'STRING AMAN 1–64 KARAKTER');
+  if (nama.length < BATAS_SKEMA.namaMin || nama.length > BATAS_SKEMA.namaMax) {
+    push('nama', `STRING ${BATAS_SKEMA.namaMin}–${BATAS_SKEMA.namaMax} KARAKTER`);
+  }
+  if (asal.length < BATAS_SKEMA.asalMin || asal.length > BATAS_SKEMA.asalMax) {
+    push('asal', `STRING ${BATAS_SKEMA.asalMin}–${BATAS_SKEMA.asalMax} KARAKTER`);
+  }
   if (!KATEGORI.includes(item.kategori)) push('kategori', 'ENUM TIDAK VALID');
   if (!UKURAN.includes(item.ukuran)) push('ukuran', 'ENUM TIDAK VALID');
   if (
-    typeof item.hargaPer2Hari !== 'number' ||
-    Number.isNaN(item.hargaPer2Hari) ||
-    !Number.isFinite(item.hargaPer2Hari) ||
-    item.hargaPer2Hari < 0
+    !Number.isInteger(item.hargaPer2Hari) ||
+    item.hargaPer2Hari < 0 ||
+    item.hargaPer2Hari > BATAS_SKEMA.hargaMax
   ) {
-    push('hargaPer2Hari', 'NUMBER VALID ≥ 0');
+    push('hargaPer2Hari', `INTEGER BULAT 0–${BATAS_SKEMA.hargaMax}`);
   }
-  if (!Number.isInteger(item.stok) || item.stok < 0) push('stok', 'INTEGER ≥ 0');
+  if (
+    !Number.isInteger(item.stok) ||
+    item.stok < 0 ||
+    item.stok > BATAS_SKEMA.stokMax
+  ) {
+    push('stok', `INTEGER BULAT 0–${BATAS_SKEMA.stokMax}`);
+  }
   if (!STATUS.includes(item.status)) push('status', 'ENUM TIDAK VALID');
-  if (typeof item.deskripsi !== 'string') push('deskripsi', 'HARUS STRING');
-  if (typeof item.imageUrl !== 'string') push('imageUrl', 'HARUS STRING');
+  if (deskripsi.length < BATAS_SKEMA.deskripsiMin || deskripsi.length > BATAS_SKEMA.deskripsiMax) {
+    push('deskripsi', `STRING ${BATAS_SKEMA.deskripsiMin}–${BATAS_SKEMA.deskripsiMax} KARAKTER`);
+  }
+  if (!isValidImagePath(item.imageUrl)) push('imageUrl', 'PATH LOKAL /images/ (SVG/PNG/JPG/WEBP)');
   if (typeof item.unggulan !== 'boolean') push('unggulan', 'HARUS BOOLEAN');
   return errors;
+}
+
+/** Bangun ulang objek bersih dari allow-list; dipakai setelah itemErrors lolos. */
+function sanitizeItem(item) {
+  return {
+    id: item.id.trim(),
+    nama: item.nama.trim(),
+    asal: item.asal.trim(),
+    kategori: item.kategori,
+    ukuran: item.ukuran,
+    hargaPer2Hari: item.hargaPer2Hari,
+    stok: item.stok,
+    status: item.status,
+    deskripsi: item.deskripsi.trim(),
+    imageUrl: normalisasiImagePath(item.imageUrl),
+    unggulan: item.unggulan,
+  };
 }
 
 /** Validator satu kostum — true hanya jika seluruh field wajib lolos. */
@@ -72,6 +135,9 @@ export function validateCostumeItem(item) {
 /** Validasi seluruh array + pesan spesifik (untuk banner import). */
 export function validateCostumeListDetailed(list) {
   if (!Array.isArray(list)) return { valid: false, errors: ['DATA BUKAN ARRAY.'] };
+  if (list.length > MAX_LIST_ITEMS) {
+    return { valid: false, errors: [`JUMLAH KOSTUM MELEBIHI ${MAX_LIST_ITEMS}.`] };
+  }
   if (list.length === 0) return { valid: false, errors: ['ARRAY KOSTUM KOSONG.'] };
 
   const errors = [];
@@ -80,8 +146,9 @@ export function validateCostumeListDetailed(list) {
     const prefix = `ITEM ${index + 1} — `;
     errors.push(...itemErrors(item, prefix));
     if (item && typeof item === 'object' && typeof item.id === 'string') {
-      if (seen.has(item.id)) errors.push(`${prefix}id: DUPLIKAT.`);
-      seen.add(item.id);
+      const id = item.id.trim();
+      if (seen.has(id)) errors.push(`${prefix}id: DUPLIKAT.`);
+      seen.add(id);
     }
   });
   return { valid: errors.length === 0, errors };
@@ -192,6 +259,10 @@ export function initStore() {
     return { products, issue: lastIssue };
   }
 
+  if (raw && raw.length > MAX_PAYLOAD_CHARS) {
+    return recover('DATA PENYIMPANAN TERLALU BESAR. KATALOG DIKEMBALIKAN KE 8 DATA CONTOH.');
+  }
+
   if (!raw) {
     products = cloneSeed();
     persist();
@@ -216,7 +287,7 @@ export function initStore() {
     );
   }
 
-  products = parsed.map((item) => ({ ...item }));
+  products = parsed.map((item) => sanitizeItem(item));
   if (usedLegacy) persist(); // migrasi ke key kanonik M6
   return { products, issue: null };
 }
@@ -270,7 +341,8 @@ function commit(next) {
 }
 
 export function saveProducts(next) {
-  return commit(Array.isArray(next) ? next : products);
+  if (!validateCostumeList(next)) return false;
+  return commit(next.map((item) => sanitizeItem(item)));
 }
 
 /** Kembalikan seluruh katalog ke 8 data awal + perbarui meta. */
@@ -303,11 +375,18 @@ export function getProductById(id) {
 export function addProduct(item) {
   const product = { ...(item ?? {}) };
   if (!product.id) product.id = createProductId();
-  return commit([...products, product]);
+  if (!validateCostumeItem(product)) return false;
+  return commit([...products, sanitizeItem(product)]);
 }
 
 export function updateProduct(id, patch) {
-  return commit(products.map((item) => (item.id === id ? { ...item, ...patch } : item)));
+  return commit(
+    products.map((item) => {
+      if (item.id !== id) return item;
+      const next = { ...item, ...(patch ?? {}) };
+      return validateCostumeItem(next) ? sanitizeItem(next) : item;
+    }),
+  );
 }
 
 export function deleteProduct(id) {
@@ -328,9 +407,14 @@ export function exportProductsJson() {
  * Tidak menulis state sama sekali ketika validasi gagal.
  */
 export function importProductsJson(raw) {
+  const teks = String(raw ?? '').replace(/^\uFEFF/, '');
+  if (teks.length > MAX_PAYLOAD_CHARS) {
+    return { ok: false, error: 'GAGAL IMPORT: FILE TERLALU BESAR.' };
+  }
+
   let parsed = null;
   try {
-    parsed = JSON.parse(String(raw ?? '').replace(/^\uFEFF/, ''));
+    parsed = JSON.parse(teks);
   } catch {
     return { ok: false, error: 'GAGAL IMPORT: ISI FILE BUKAN JSON YANG VALID.' };
   }
@@ -341,7 +425,7 @@ export function importProductsJson(raw) {
     return { ok: false, error: `GAGAL IMPORT: ${detail}` };
   }
 
-  commit(parsed.map((item) => ({ ...item })));
+  commit(parsed.map((item) => sanitizeItem(item)));
   return { ok: true, count: parsed.length };
 }
 

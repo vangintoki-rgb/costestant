@@ -118,7 +118,7 @@ Kedua peran memakai **perangkat dan browser yang sama**. Tidak ada pembedaan hak
 ## 4. Data Model & Aturan Validasi
 
 ### 4.1 Struktur Data Kostum
-Disimpan sebagai array of object di localStorage dengan key **`costestant.kostum.v1`**.
+Disimpan sebagai array of object di localStorage dengan key kanonik **`costestant:costumes:v1`**; key lama `costestant.kostum.v1` dibaca sekali untuk migrasi bila key kanonik belum ada.
 
 | Field | Tipe | Wajib | Aturan | Contoh |
 |---|---|---|---|---|
@@ -233,8 +233,9 @@ Mohon konfirmasi ketersediaannya. Terima kasih!
 - Seed ini dipakai ulang persis oleh tombol **Reset ke Data Awal**.
 
 ### 4.7 Penyimpanan & Reset
-- Key localStorage: `costestant.kostum.v1` (array JSON).
+- Key localStorage kanonik: `costestant:costumes:v1` (array JSON). Key lama `costestant.kostum.v1` dibaca sekali untuk migrasi.
 - Opsional key meta: `costestant.meta.v1` = `{ "version": 1, "lastReset": "<ISO>" }`.
+- Batas defensif: maksimal 500 kostum dan 1.000.000 karakter per payload, baik saat memuat localStorage maupun saat import JSON.
 - Saat aplikasi dibuka:
   - Jika key belum ada / JSON rusak / bukan array → inisialisasi dengan seed (F1.1) dan simpan.
   - Jika valid → pakai data dari localStorage.

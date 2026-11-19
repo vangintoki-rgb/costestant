@@ -24,6 +24,7 @@
 | 4 | Modal Detail, Kalkulator & WhatsApp | 65 mnt | Modal, hitung sewa, wa.me, simulasi | C1–C8, D1–D4 |
 | 5 | Dashboard Demo Pengelola (CRUD) | 75 mnt | Statistik, tabel, form, status, hapus | E1–E7 (in-memory) |
 | 6 | Persistensi localStorage & Reset | 40 mnt | `storage.js`, auto-reseed, reset penuh | E2/E4/E7 penuh, F4 |
+| 6A | Testing Otomatis (Vitest) | 15 mnt | `vitest run`, 19 unit test, mock localStorage | logika M2–M6 |
 | 7 | Testing Manual & Responsivitas | 60 mnt | UAT A–F, breakpoint, kontras | A1–F5 |
 | 8 | Security & Sanitasi Input | 30 mnt | Anti-XSS, validasi angka, audit rahasia | E3, F5, D3 |
 | 9 | Production Build | 25 mnt | `dist/`, preview bersih, aset optimum | F3, NFR2 |
@@ -240,7 +241,7 @@
 > **Catatan implementasi (M6):**
 > 1. Sesuai instruksi M6, key kanonik harus **`costestant:costumes:v1`** (bukan `costestant.kostum.v1` seperti di daftar tugas/4.7). `src/store.js` memakai key baru untuk baca/tulis; key lama M1–M5 tetap dibaca **sekali** sebagai migrasi bila key baru belum ada, lalu ditulis ke key baru. Key meta `costestant.meta.v1` dipertahankan.
 > 2. Tidak ada modul baru (`src/storage.js` / `src/state.js` / `src/data/seed.js`) sesuai batasan file M6: load/save/reset, `validateCostumeItem()`, `validateCostumeList()`, `validateCostumeListDetailed()`, `exportProductsJson()`, dan `importProductsJson()` semuanya diekspor dari **`src/store.js`**. Semua mutasi (CRUD, status cepat, simulasi sewa, reset, import) lewat satu `commit()`.
-> 3. Peraturan user lebih spesifik dari 4.1 untuk `hargaPer2Hari` (cukup `typeof === 'number' && !NaN && >= 0`), jadi validator storage memakai aturan itu (ditambah `Number.isFinite` sebagai pengaman); batas atas 100.000.000 tetap dijaga form `validateProductDraft()`. `id` duplikat dan array kosong ditolak — array kosong dianggap data rusak → auto-reseed 8 kostum (T6.2), sehingga impor `[]` juga ditolak dengan pesan spesifik.
+> 3. Audit M6B menyatukan aturan form dan storage: `hargaPer2Hari` wajib integer `0–100.000.000`, `stok` integer `0–999`, panjang teks/path gambar mengikuti 4.1. Batas tersebut kini berada di `BATAS_SKEMA` (`src/products.js`) dan dipakai bersama oleh `validateProductDraft()` dan `itemErrors()`. `id` duplikat, kunci asing (`__proto__`/`constructor`/`prototype`), array kosong, dan array > 500 ditolak; array kosong tetap auto-reseed 8 kostum (T6.2).
 > 4. Data rusak (JSON gagal di-`parse` / skema invalid / array kosong) → **banner merah persisten** di atas panel utama + auto-reseed 8 seed fiktif M2. Storage gagal (private mode/kuota) → banner kuning + toast kuning sekali per sesi; state tetap in-memory (F4). Semua teks banner/error/toast ditulis dengan `textContent`.
 > 5. Toolbar `DATA & CADANGAN` di bagian atas dashboard berisi `EXPORT JSON` (Blob + `URL.createObjectURL`, nama `costestant-backup.json`), `IMPORT JSON` (`<input type="file" accept=".json">`, parsing `try/catch`, validasi per item, error menyebut `ITEM n — field: alasan`), dan `RESET DATA DUMMY` (tetap lewat `window.confirm`). Nama seed memakai kostum fiktif M2 seperti keputusan M5.
 
@@ -268,6 +269,76 @@
   - **Deskripsi:** Pastikan 3 kartu statistik dan chip navbar dihitung ulang dari state hasil load storage, bukan dari seed statis.
   - **AC (manual browser):** **E1 penuh** lolos: setelah ubah status Samus → Tersedia lalu refresh, chip navbar & kartu statistik tetap konsisten dengan data tersimpan; pada seed murni kembali menampilkan **8 / 17 / 1**.
   - **File:** `src/ui/dashboard.js`, `src/ui/layout.js`, `src/main.js`
+
+---
+
+## Milestone 6A — Testing Otomatis (Vitest) (~15 menit)
+
+**Tujuan:** Menguji logika murni dan parser penyimpanan tanpa browser, sekali jalan tanpa watch mode.
+**Gate masuk:** M1–M6 selesai.
+**Gate keluar:** `npm test` selesai, seluruh test lulus, proses tidak menggantung.
+
+> **Catatan implementasi (M6A):**
+> 1. `vitest` dipasang sebagai **devDependency**; `package.json` mendapat script `"test": "vitest run"` (bukan `vitest` biasa, agar tidak masuk mode watch).
+> 2. Suite berada di `tests/costestant.test.js`. Awalnya berisi **19 kasus**: 7 `filterProducts`, 3 `validateCostumeItem`/list, 4 kalkulator + WhatsApp, 5 parser/pemulihan localStorage (+ mutasi). Milestone 6B menambah 8 kasus hardening sehingga total menjadi **27 kasus**. Mock `window.localStorage` memakai `Map`; `vi.resetModules()` dipakai karena `store.js` menyimpan state di module scope.
+> 3. Sesuai ketentuan pengujian, `isValidWhatsAppNumber()` dan `buildWhatsAppUrl()` di `src/products.js` diperketat: **hanya digit internasional**, `08...`/huruf/simbol/nomor pendek ditolak. `normalisasiNomorWhatsApp()` tetap diekspor sebagai utilitas kompatibilitas. UI tidak berubah karena `WHATSAPP_NUMBER = '6281234567890'` (placeholder) tetap dipakai.
+> 4. Tugas **T7.1–T7.6 (UAT manual browser/responsivitas) tidak** ditandai selesai oleh milestone ini; milestone ini hanya menguji logika dan storage.
+>
+> **Hasil aktual `npm test` (2026-11-19):** `Test Files 1 passed (1)`, `Tests 19 passed (19)`. Dua eksekusi nyata: `278ms` (run pertama) dan `225ms` (run terakhir, setelah seluruh perubahan selesai) dengan Vitest 5.1.1.
+
+- [x] **T6A.1 — Instalasi & konfigurasi Vitest**
+  - **Deskripsi:** Jalankan `npm install -D vitest`; tambahkan script `test: "vitest run"` di `package.json`.
+  - **AC (terminal):** `npm test` keluar dengan kode 0 dan kembali ke prompt tanpa menunggu input/watch.
+  - **File:** `package.json`, `package-lock.json`
+
+- [x] **T6A.2 — Suite unit test `tests/costestant.test.js`**
+  - **Deskripsi:** Minimal 10 kasus terisolasi: pencarian nama/asal case-insensitive, filter AND kategori/ukuran/status, sort `harga-asc`/`harga-desc`/`nama-asc`, empty result, batas `hargaPer2Hari = 0`/`stok = 0`, penolakan angka negatif/desimal/enum invalid, kalkulator sewa Rp 100.000/2 hari + pembulatan, validasi nomor WA + `encodeURIComponent`, serta load/reseed `costestant:costumes:v1`.
+  - **AC (terminal):** 19 test awal lulus (menjadi 27 setelah M6B); tidak ada ketergantungan DOM; localStorage di-mock sederhana.
+  - **File:** `tests/costestant.test.js`, `src/products.js` (penyesuaian validator nomor)
+
+- [x] **T6A.3 — Eksekusi & pelaporan hasil aktual**
+  - **Deskripsi:** Jalankan `npm test` di terminal dan catat jumlah suite, passed/failed, serta waktu eksekusi apa adanya.
+  - **AC (terminal):** Dilaporkan 1 file test, 19 passed, 0 failed; durasi aktual terakhir 225ms (run pertama 278ms) — bukan hasil perkiraan.
+  - **File:** `TASKS.md`, hasil terminal `npm test`
+
+---
+
+## Milestone 6B — Audit Keamanan Defensif & Hardening (~30 menit)
+
+**Tujuan:** Menindaklanjuti audit OWASP Top 10:2025 tanpa mengubah perilaku UI normal.
+**Gate masuk:** M1–M6A selesai, laporan audit sudah ditinjau user.
+**Gate keluar:** `npm test` & `npm run build` lolos; CSP aktif di artifact build; tidak ada secret/dependensi rentan.
+
+> **Catatan implementasi (M6B):**
+> 1. **C-01/C-02:** `BATAS_SKEMA`, `ID_PATTERN`, `isValidImagePath()`, dan `normalisasiImagePath()` ditambahkan di `src/products.js`. Form dan validator storage/import sekarang memakai satu sumber aturan yang sama. Path gambar hanya `/images/...` (skema URL, backslash, dan `..` ditolak); `''` dinormalisasi ke `/images/placeholder.svg`.
+> 2. **C-03:** `MAX_IMPORT_BYTES`/`MAX_PAYLOAD_CHARS = 1.000.000` dan `MAX_LIST_ITEMS = 500` ditambahkan di `src/store.js`. `src/main.js` menolak file > 1 MB dan tipe MIME selain `application/json` sebelum membaca isi file.
+> 3. **C-04/P-01/P-03:** `itemErrors()` menolak kunci di luar allow-list 11 field skema; `sanitizeItem()` membangun ulang objek bersih untuk setiap jalur masuk (load, import, add, save). Tidak ada prototype pollution: `Object.prototype` tetap bersih pada test regresi.
+> 4. **C-05/C-06:** `vite.config.js` (baru) menyuntikkan CSP hanya saat `build` agar Vite dev/HMR tidak terganggu. `modulePreload.polyfill` dimatikan supaya tidak ada inline script di `dist/`. Font Google tetap dipakai dengan `crossorigin="anonymous"` dan di-allowlist di CSP; **SRI tidak dipasang** karena CSS Google Fonts bergantung User-Agent sehingga hash tidak stabil.
+> 5. **P-04/P-05:** Fallback UUID memakai `Math.random` dan cadangan JSON tanpa checksum sengaja dipertahankan (bukan token/rahasia; sesuai ruang lingkup prototipe). P-06 ditindaklanjuti dengan penyelarasan key storage di `SPEC.md`.
+>
+> **Hasil aktual `npm test` (2026-11-19, setelah M6B):** `Test Files 1 passed (1)`, `Tests 27 passed (27)`. Tiga eksekusi: `337ms`, `311ms`, dan `425ms` (run final setelah hardening `updateProduct()`) dengan Vitest 5.1.1.
+> **Hasil aktual `npm run build` (final):** 6 modules transformed, `dist/index.html` 1.32 kB, JS 43.64 kB (gzip 14.67 kB), CSS 24.79 kB, selesai dalam 309ms. Meta CSP terverifikasi di `dist/index.html:4`.
+> **`npm audit`:** 0 kerentanan (info/low/moderate/high/critical).
+
+- [x] **T6B.1 — Validasi path gambar & batas skema terpusat**
+  - **Deskripsi:** Pindahkan batas ke `BATAS_SKEMA`, `isValidImagePath()`, `normalisasiImagePath()` di `src/products.js`; pakai di form dan storage/import.
+  - **AC:** Path eksternal, `data:`, `javascript:`, traversal, dan backslash ditolak; batas harga/stok/teks identik di kedua jalur.
+  - **File:** `src/products.js`, `src/store.js`, `src/ui.js`
+
+- [x] **T6B.2 — Batas payload & allow-list objek**
+  - **Deskripsi:** Batasi file/string 1 MB, jumlah item 500, tolak kunci asing, sanitasi objek sebelum masuk state.
+  - **AC:** Impor besar, array > 500, dan payload `__proto__` ditolak tanpa mengubah state/`Object.prototype`.
+  - **File:** `src/store.js`, `src/main.js`
+
+- [x] **T6B.3 — CSP build-time & konfigurasi Vite**
+  - **Deskripsi:** Tambah `vite.config.js` dengan plugin `costestant-csp` (apply: build) dan `modulePreload.polyfill: false`; `crossorigin` pada font.
+  - **AC:** `dist/index.html` memuat CSP tanpa inline script; `npm run dev` tidak terkena CSP.
+  - **File:** `vite.config.js`, `index.html`, `dist/index.html` (generated)
+
+- [x] **T6B.4 — Test regresi & pelaporan**
+  - **Deskripsi:** Tambah 8 test hardening; jalankan `npm test`, `npm run build`, `npm audit`; rapikan `SPEC.md`/`TASKS.md`.
+  - **AC:** 27 test lulus, build sukses, audit bersih, dokumentasi sesuai kode.
+  - **File:** `tests/costestant.test.js`, `SPEC.md`, `TASKS.md`
 
 ---
 

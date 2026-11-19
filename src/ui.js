@@ -4,10 +4,10 @@
  * (SPEC.md 4.2.8 / R3).
  */
 import {
+  BATAS_SKEMA,
   DURASI_MAX,
   DURASI_MIN,
   KATEGORI,
-  PLACEHOLDER_IMAGE,
   STATUS,
   UKURAN,
   WHATSAPP_NUMBER,
@@ -15,6 +15,8 @@ import {
   clampDurasi,
   formatRupiah,
   getRentalBreakdown,
+  isValidImagePath,
+  normalisasiImagePath,
 } from './products.js';
 
 export { formatRupiah };
@@ -780,16 +782,31 @@ export function validateProductDraft(raw = {}) {
   const hargaRaw = text('hargaPer2Hari');
   const stokRaw = text('stok');
 
-  if (nama.length < 3 || nama.length > 80) errors.nama = 'NAMA WAJIB DIISI (3–80 KARAKTER).';
-  if (asal.length < 2 || asal.length > 80) errors.asal = 'ASAL WAJIB DIISI (2–80 KARAKTER).';
+  const {
+    namaMin,
+    namaMax,
+    asalMin,
+    asalMax,
+    deskripsiMin,
+    deskripsiMax,
+    hargaMax,
+    stokMax,
+  } = BATAS_SKEMA;
+
+  if (nama.length < namaMin || nama.length > namaMax) {
+    errors.nama = `NAMA WAJIB DIISI (${namaMin}–${namaMax} KARAKTER).`;
+  }
+  if (asal.length < asalMin || asal.length > asalMax) {
+    errors.asal = `ASAL WAJIB DIISI (${asalMin}–${asalMax} KARAKTER).`;
+  }
   if (!KATEGORI.includes(kategori)) errors.kategori = 'PILIH KATEGORI YANG VALID.';
   if (!UKURAN.includes(ukuran)) errors.ukuran = 'PILIH UKURAN YANG VALID.';
 
   let hargaPer2Hari = 100000;
   if (hargaRaw !== '') {
     const value = Number(hargaRaw);
-    if (!Number.isInteger(value) || value < 0 || value > 100000000) {
-      errors.hargaPer2Hari = 'HARGA HARUS ANGKA BULAT 0–100000000.';
+    if (!Number.isInteger(value) || value < 0 || value > hargaMax) {
+      errors.hargaPer2Hari = `HARGA HARUS ANGKA BULAT 0–${hargaMax}.`;
     } else {
       hargaPer2Hari = value;
     }
@@ -800,8 +817,8 @@ export function validateProductDraft(raw = {}) {
     errors.stok = 'STOK WAJIB DIISI (BILANGAN BULAT ≥ 0).';
   } else {
     const value = Number(stokRaw);
-    if (!Number.isInteger(value) || value < 0 || value > 999) {
-      errors.stok = 'STOK HARUS BILANGAN BULAT 0–999.';
+    if (!Number.isInteger(value) || value < 0 || value > stokMax) {
+      errors.stok = `STOK HARUS BILANGAN BULAT 0–${stokMax}.`;
     } else {
       stok = value;
     }
@@ -811,14 +828,15 @@ export function validateProductDraft(raw = {}) {
 
   let deskripsi = text('deskripsi');
   if (deskripsi === '') deskripsi = 'Lengkap: kostum, wig, dan aksesoris sesuai tema.';
-  else if (deskripsi.length < 10 || deskripsi.length > 500) {
-    errors.deskripsi = 'DESKRIPSI HARUS 10–500 KARAKTER.';
+  else if (deskripsi.length < deskripsiMin || deskripsi.length > deskripsiMax) {
+    errors.deskripsi = `DESKRIPSI HARUS ${deskripsiMin}–${deskripsiMax} KARAKTER.`;
   }
 
   let imageUrl = text('imageUrl');
-  if (imageUrl === '') imageUrl = PLACEHOLDER_IMAGE;
-  else if (!/^\/images\/[A-Za-z0-9._/-]+\.(svg|png|jpe?g|webp)$/i.test(imageUrl)) {
+  if (!isValidImagePath(imageUrl)) {
     errors.imageUrl = 'PATH GAMBAR HARUS DI /images/ (SVG/PNG/JPG/WEBP).';
+  } else {
+    imageUrl = normalisasiImagePath(imageUrl);
   }
 
   return {
