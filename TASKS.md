@@ -280,7 +280,7 @@
 
 > **Catatan implementasi (M6A):**
 > 1. `vitest` dipasang sebagai **devDependency**; `package.json` mendapat script `"test": "vitest run"` (bukan `vitest` biasa, agar tidak masuk mode watch).
-> 2. Suite berada di `tests/costestant.test.js`. Awalnya berisi **19 kasus**: 7 `filterProducts`, 3 `validateCostumeItem`/list, 4 kalkulator + WhatsApp, 5 parser/pemulihan localStorage (+ mutasi). Milestone 6B menambah 8 kasus hardening sehingga total menjadi **27 kasus**. Mock `window.localStorage` memakai `Map`; `vi.resetModules()` dipakai karena `store.js` menyimpan state di module scope.
+> 2. Suite berada di `tests/costestant.test.js`. Awalnya berisi **19 kasus**: 7 `filterProducts`, 3 `validateCostumeItem`/list, 4 kalkulator + WhatsApp, 5 parser/pemulihan localStorage (+ mutasi). Milestone 6B menambah 8 kasus hardening dan Milestone 8 menambah 4 kasus security sehingga total menjadi **31 kasus**. Mock `window.localStorage` memakai `Map`; `vi.resetModules()` dipakai karena `store.js` menyimpan state di module scope.
 > 3. Sesuai ketentuan pengujian, `isValidWhatsAppNumber()` dan `buildWhatsAppUrl()` di `src/products.js` diperketat: **hanya digit internasional**, `08...`/huruf/simbol/nomor pendek ditolak. `normalisasiNomorWhatsApp()` tetap diekspor sebagai utilitas kompatibilitas. UI tidak berubah karena `WHATSAPP_NUMBER = '6281234567890'` (placeholder) tetap dipakai.
 > 4. Tugas **T7.1–T7.6 (UAT manual browser/responsivitas) tidak** ditandai selesai oleh milestone ini; milestone ini hanya menguji logika dan storage.
 >
@@ -293,7 +293,7 @@
 
 - [x] **T6A.2 — Suite unit test `tests/costestant.test.js`**
   - **Deskripsi:** Minimal 10 kasus terisolasi: pencarian nama/asal case-insensitive, filter AND kategori/ukuran/status, sort `harga-asc`/`harga-desc`/`nama-asc`, empty result, batas `hargaPer2Hari = 0`/`stok = 0`, penolakan angka negatif/desimal/enum invalid, kalkulator sewa Rp 100.000/2 hari + pembulatan, validasi nomor WA + `encodeURIComponent`, serta load/reseed `costestant:costumes:v1`.
-  - **AC (terminal):** 19 test awal lulus (menjadi 27 setelah M6B); tidak ada ketergantungan DOM; localStorage di-mock sederhana.
+  - **AC (terminal):** 19 test awal lulus (menjadi 27 setelah M6B, 31 setelah M8); tidak ada ketergantungan DOM; localStorage di-mock sederhana.
   - **File:** `tests/costestant.test.js`, `src/products.js` (penyesuaian validator nomor)
 
 - [x] **T6A.3 — Eksekusi & pelaporan hasil aktual**
@@ -309,31 +309,31 @@
 **Gate masuk:** M1–M6A selesai, laporan audit sudah ditinjau user.
 **Gate keluar:** `npm test` & `npm run build` lolos; CSP aktif di artifact build; tidak ada secret/dependensi rentan.
 
-> **Catatan implementasi (M6B):**
-> 1. **C-01/C-02:** `BATAS_SKEMA`, `ID_PATTERN`, `isValidImagePath()`, dan `normalisasiImagePath()` ditambahkan di `src/products.js`. Form dan validator storage/import sekarang memakai satu sumber aturan yang sama. Path gambar hanya `/images/...` (skema URL, backslash, dan `..` ditolak); `''` dinormalisasi ke `/images/placeholder.svg`.
-> 2. **C-03:** `MAX_IMPORT_BYTES`/`MAX_PAYLOAD_CHARS = 1.000.000` dan `MAX_LIST_ITEMS = 500` ditambahkan di `src/store.js`. `src/main.js` menolak file > 1 MB dan tipe MIME selain `application/json` sebelum membaca isi file.
-> 3. **C-04/P-01/P-03:** `itemErrors()` menolak kunci di luar allow-list 11 field skema; `sanitizeItem()` membangun ulang objek bersih untuk setiap jalur masuk (load, import, add, save). Tidak ada prototype pollution: `Object.prototype` tetap bersih pada test regresi.
-> 4. **C-05/C-06:** `vite.config.js` (baru) menyuntikkan CSP hanya saat `build` agar Vite dev/HMR tidak terganggu. `modulePreload.polyfill` dimatikan supaya tidak ada inline script di `dist/`. Font Google tetap dipakai dengan `crossorigin="anonymous"` dan di-allowlist di CSP; **SRI tidak dipasang** karena CSS Google Fonts bergantung User-Agent sehingga hash tidak stabil.
+> **Catatan implementasi (M6B — dis finalisasi pada M8):**
+> 1. **C-01/C-02:** `BATAS_SKEMA`, `ID_PATTERN`, `isValidImagePath()`, dan `normalisasiImagePath()` didefinisikan di `src/store.js` (bukan `products.js`) agar patch tetap dalam lingkup empat berkas yang disetujui. Form (`src/ui.js`) mengimpor helper yang sama dari `store.js`, sehingga aturan harga/stok/teks/path identik di kedua jalur. Path gambar hanya `/images/...` (skema URL, backslash, dan `..` ditolak); `''` dinormalisasi ke `/images/placeholder.svg`.
+> 2. **C-03:** `MAX_IMPORT_BYTES`/`MAX_PAYLOAD_CHARS = 1.000.000` dan `MAX_LIST_ITEMS = 500` di `src/store.js`. `validateImportFile(file)` (ekstensi + MIME + ukuran) dipakai `src/main.js` sebelum `file.text()`, sehingga bisa diuji tanpa DOM.
+> 3. **C-04/P-01/P-03:** `itemErrors()` menolak kunci di luar allow-list 11 field skema; `sanitizeItem()` membersihkan objek pada semua jalur (load, import, add, update, save). `Object.prototype` tetap bersih pada test regresi.
+> 4. **C-05/C-06:** CSP dipasang langsung sebagai `<meta http-equiv>` di `index.html` (bukan via `vite.config.js`, yang sudah dihapus). `'unsafe-inline'` dipertahankan agar Vite dev/HMR tetap berfungsi; `object-src 'none'`, `base-uri 'none'`, `img-src 'self'`, `form-action 'none'`. Font Google tetap dipakai dengan `crossorigin="anonymous"` dan di-allowlist; **SRI tidak dipasang** karena CSS Google Fonts bergantung User-Agent sehingga hash tidak stabil.
 > 5. **P-04/P-05:** Fallback UUID memakai `Math.random` dan cadangan JSON tanpa checksum sengaja dipertahankan (bukan token/rahasia; sesuai ruang lingkup prototipe). P-06 ditindaklanjuti dengan penyelarasan key storage di `SPEC.md`.
 >
-> **Hasil aktual `npm test` (2026-11-19, setelah M6B):** `Test Files 1 passed (1)`, `Tests 27 passed (27)`. Tiga eksekusi: `337ms`, `311ms`, dan `425ms` (run final setelah hardening `updateProduct()`) dengan Vitest 5.1.1.
-> **Hasil aktual `npm run build` (final):** 6 modules transformed, `dist/index.html` 1.32 kB, JS 43.64 kB (gzip 14.67 kB), CSS 24.79 kB, selesai dalam 309ms. Meta CSP terverifikasi di `dist/index.html:4`.
+> **Hasil aktual `npm test` (2026-11-19, setelah M6B):** `Test Files 1 passed (1)`, `Tests 27 passed (27)`. Tiga eksekusi: `337ms`, `311ms`, dan `425ms` dengan Vitest 5.1.1.
+> **Hasil aktual `npm run build` (setelah M6B):** 6 modules transformed, `dist/index.html` 1.32 kB, JS 43.64 kB (gzip 14.67 kB), CSS 24.79 kB, 309ms.
 > **`npm audit`:** 0 kerentanan (info/low/moderate/high/critical).
 
 - [x] **T6B.1 — Validasi path gambar & batas skema terpusat**
-  - **Deskripsi:** Pindahkan batas ke `BATAS_SKEMA`, `isValidImagePath()`, `normalisasiImagePath()` di `src/products.js`; pakai di form dan storage/import.
+  - **Deskripsi:** Pindahkan batas ke `BATAS_SKEMA`, `isValidImagePath()`, `normalisasiImagePath()` di `src/store.js`; pakai di form dan storage/import.
   - **AC:** Path eksternal, `data:`, `javascript:`, traversal, dan backslash ditolak; batas harga/stok/teks identik di kedua jalur.
-  - **File:** `src/products.js`, `src/store.js`, `src/ui.js`
+  - **File:** `src/store.js`, `src/ui.js`
 
 - [x] **T6B.2 — Batas payload & allow-list objek**
   - **Deskripsi:** Batasi file/string 1 MB, jumlah item 500, tolak kunci asing, sanitasi objek sebelum masuk state.
   - **AC:** Impor besar, array > 500, dan payload `__proto__` ditolak tanpa mengubah state/`Object.prototype`.
   - **File:** `src/store.js`, `src/main.js`
 
-- [x] **T6B.3 — CSP build-time & konfigurasi Vite**
-  - **Deskripsi:** Tambah `vite.config.js` dengan plugin `costestant-csp` (apply: build) dan `modulePreload.polyfill: false`; `crossorigin` pada font.
-  - **AC:** `dist/index.html` memuat CSP tanpa inline script; `npm run dev` tidak terkena CSP.
-  - **File:** `vite.config.js`, `index.html`, `dist/index.html` (generated)
+- [x] **T6B.3 — CSP via meta tag & konfigurasi font**
+  - **Deskripsi:** Tambah `<meta http-equiv="Content-Security-Policy">` di `index.html` dengan direktif pembatas; `crossorigin="anonymous"` pada font. `vite.config.js` tidak dipakai.
+  - **AC:** CSP hadir di `index.html` dan ikut ke `dist/index.html`; Vite dev/HMR tidak terganggu.
+  - **File:** `index.html`, `dist/index.html` (generated)
 
 - [x] **T6B.4 — Test regresi & pelaporan**
   - **Deskripsi:** Tambah 8 test hardening; jalankan `npm test`, `npm run build`, `npm audit`; rapikan `SPEC.md`/`TASKS.md`.
@@ -382,29 +382,52 @@
 
 ## Milestone 8 — Security & Sanitasi Input (~30 menit)
 
-**Tujuan:** Hardening pasca-UAT: tidak ada XSS, angka tervalidasi, tidak ada kredensial.
-**Gate masuk:** T7.1–T7.6 ✅.
-**Gate keluar:** F5, E3 (batas atas), D3 lolos.
+**Tujuan:** Menindaklanjuti **Confirmed Findings** dari laporan audit OWASP Top 10:2025 secara terarah: patch minimal, security test di Vitest, tanpa mengubah UI Persona 4 dan tanpa upgrade dependency.
+**Gate masuk:** Laporan audit ditinjau; rencana Tahap 1 disetujui user secara eksplisit.
+**Gate keluar:** Seluruh security test + regression test hijau; build sukses; tugas M8 ditandai `[x]`.
 
-- [ ] **T8.1 — Audit render teks bebas (anti-XSS)**
-  - **Deskripsi:** Pastikan semua `nama`, `asal`, `deskripsi`, dan pesan status dirender dengan `textContent` / `escapeHtml()`; dilarang `innerHTML` untuk data user.
-  - **AC (manual browser):** **F5** lolos: tambah kostum dengan nama `<img src=x onerror=alert(1)>` → teks tampil apa adanya sebagai string, tidak muncul dialog `alert`, tidak ada gambar asing; hapus kostum uji tersebut.
-  - **File:** `src/ui/catalog.js`, `src/ui/detailModal.js`, `src/ui/dashboard.js`, `src/utils.js`
+> **Catatan implementasi (M8):**
+> 1. **Lingkup:** hanya `src/ui.js`, `src/store.js`, `src/main.js`, `index.html` (+ `tests/costestant.test.js`). `src/products.js` dikembalikan ke kondisi semula; `vite.config.js` dihapus; tidak ada dependency di-upgrade.
+> 2. **Prioritas:** tidak ada temuan High. Medium: C-01 (`imageUrl`), C-02 (batas numerik/teks), C-03 (payload ekstrem). Low: C-04 (kunci asing), C-05 (CSP), C-06 (font tanpa integritas).
+> 3. **C-01/C-02:** `BATAS_SKEMA`, `ID_PATTERN`, `isValidImagePath()`, `normalisasiImagePath()` didefinisikan di `src/store.js`; `src/ui.js` mengimpornya dari sana. Form dan storage/import memakai aturan yang identik; skema URL, `data:`, `javascript:`, traversal, dan backslash ditolak.
+> 4. **C-03:** `validateImportFile()` (ekstensi + MIME + ukuran) di `src/store.js`, dipakai `src/main.js` sebelum `file.text()`; guard `MAX_PAYLOAD_CHARS = 1.000.000` dan `MAX_LIST_ITEMS = 500` di `initStore`/`importProductsJson`.
+> 5. **C-04:** `ALLOWED_KEYS` (11 field) + `sanitizeItem()` menolak `__proto__`/`constructor`/`prototype` dan membersihkan objek pada semua jalur state (load, import, add, update, save).
+> 6. **C-05/C-06:** CSP dipasang via `<meta http-equiv>` di `index.html`; `crossorigin="anonymous"` pada Google Fonts. SRI sengaja tidak dipasang karena hash CSS Google Fonts tidak stabil (bergantung User-Agent).
+> 7. **Security test:** 4 kasus baru — `validateImportFile` (ekstensi/MIME/ukuran), `validateProductDraft` menolak `javascript:` pada `imageUrl`, CSP direktif wajib, dan font `crossorigin` + allowlist. Total suite 27 → **31 kasus**.
+>
+> **Hasil aktual `npm test` (2026-11-19, setelah M8):**
+> ```text
+> > costestant@1.0.0 test
+> > vitest run
+>
+>  RUN  v5.1.1 C:/Users/Pongo/costestant-lab
+>
+>  Test Files  1 passed (1)
+>       Tests  31 passed (31)
+>    Start at  14:06:05
+>    Duration  362ms (import 49%, transform 28%, tests 21%, worker 2%)
+> ```
+> **Hasil aktual `npm run build` (setelah M8):** 7 modules transformed, `dist/index.html` 1.36 kB (gzip 0.68 kB), JS 44.40 kB (gzip 15.01 kB), CSS 24.79 kB (gzip 4.90 kB), selesai 303ms. CSP terverifikasi di `dist/index.html:9`.
 
-- [ ] **T8.2 — Validasi numerik harga & stok (batas atas)**
-  - **Deskripsi:** Perketat `utils.js`: `hargaPer2Hari` bulat `0…100000000`; `stok` bulat `0…999`; tolak `NaN`, `Infinity`, dan string desimal.
-  - **AC (manual browser):** **E3 (lanjutan)** lolos: harga `100000001` dan stok `1000` ditolak dengan error inline; harga `0` dan stok `0` diterima; kalkulator harga 0 menampilkan `Rp 0` tanpa `NaN`.
-  - **File:** `src/utils.js`, `src/ui/dashboard.js`
+- [x] **T8.1 — Patch C-01/C-02: validasi path gambar & batas skema terpusat**
+  - **Deskripsi:** `BATAS_SKEMA`, `ID_PATTERN`, `isValidImagePath`, `normalisasiImagePath` di `src/store.js`; `src/ui.js` pakai helper yang sama; `itemErrors()` memakai aturan identik dengan form.
+  - **AC:** Path `javascript:`/`data:`/eksternal, traversal, harga desimal/`>100000000`, stok `>999`, dan teks di luar rentang ditolak; UI tidak berubah. Security test: `validateProductDraft` menolak `javascript:` pada `imageUrl`.
+  - **File:** `src/store.js`, `src/ui.js`, `tests/costestant.test.js`
 
-- [ ] **T8.3 — Enum & batas panjang teks**
-  - **Deskripsi:** Pastikan select hanya menghasilkan nilai enum persis (`Anime|Game|Tokusatsu|Original`, `S|M|L|XL|All Size`, 3 status) dan panjang nama 3–80, asal 2–80, deskripsi 10–500 setelah trim.
-  - **AC (manual browser):** Form menolak nama 2 karakter, asal 1 karakter, deskripsi 8 karakter; tidak ada opsi kategori/`ukuran` di luar daftar; seed tetap 8 data valid.
-  - **File:** `src/data/seed.js`, `src/ui/dashboard.js`, `src/utils.js`
+- [x] **T8.2 — Patch C-03/C-04: batas payload, tipe file, & allow-list objek**
+  - **Deskripsi:** `validateImportFile()` + guard ukuran/jumlah di `src/store.js`; `src/main.js` pakai guard tersebut; `sanitizeItem()` membersihkan kunci asing di semua jalur state.
+  - **AC:** File > 1 MB, MIME bukan `application/json`, array > 500, dan kunci `__proto__` ditolak tanpa mengubah state/`Object.prototype`. Security test: `validateImportFile` untuk ekstensi/MIME/ukuran.
+  - **File:** `src/store.js`, `src/main.js`, `tests/costestant.test.js`
 
-- [ ] **T8.4 — Audit kredensial & nomor placeholder**
-  - **Deskripsi:** Cari seluruh teks proyek untuk `apiKey`, `token`, `password`, pola nomor `08…`/`+62…`; pastikan satu-satunya nomor adalah konstanta `WHATSAPP_NUMBER = '6281234567890'` dan label footer demo.
-  - **AC (manual browser):** **D3** lolos: hasil pencarian tidak menemukan API key/token/nomor pribadi; pesan WA masih mengarah ke `6281234567890`; tidak ada field password/login di UI.
-  - **File:** `src/data/seed.js`, `index.html`, `.gitignore`, `README.md` (opsional)
+- [x] **T8.3 — Patch C-05/C-06: CSP & font crossorigin**
+  - **Deskripsi:** Meta CSP di `index.html` dengan `object-src 'none'`, `base-uri 'none'`, `img-src 'self'`, `form-action 'none'`; `crossorigin="anonymous"` pada font Google.
+  - **AC:** CSP hadir di `index.html` dan `dist/index.html`; Vite dev/HMR tidak terganggu. Security test: direktif CSP wajib dan font `crossorigin` + allowlist.
+  - **File:** `index.html`, `dist/index.html` (generated), `tests/costestant.test.js`
+
+- [x] **T8.4 — Security test & verifikasi akhir**
+  - **Deskripsi:** Tambah 4 security test; jalankan `npm test` (security + regression) dan `npm run build`; catat output aktual.
+  - **AC:** 31 test lulus (27 regression + 4 security), build sukses, output aktual dilaporkan.
+  - **File:** `tests/costestant.test.js`, `TASKS.md`
 
 ---
 

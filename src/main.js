@@ -4,7 +4,6 @@
  */
 import './style.css';
 import {
-  MAX_IMPORT_BYTES,
   initStore,
   getProducts,
   getStats,
@@ -20,6 +19,7 @@ import {
   resetProducts,
   exportProductsJson,
   importProductsJson,
+  validateImportFile,
   subscribe,
 } from './store.js';
 import {
@@ -44,8 +44,6 @@ const refs = renderLayout(root);
    ------------------------------------------------------------ */
 
 const STORAGE_WARNING = 'PENYIMPANAN LOKAL TIDAK TERSEDIA; PERUBAHAN HANYA SESI INI.';
-const IMPORT_MIME_ERROR = 'GAGAL IMPORT: TIPE FILE HARUS APPLICATION/JSON.';
-const IMPORT_SIZE_ERROR = 'GAGAL IMPORT: UKURAN FILE MELEBIHI BATAS.';
 let storageWarned = false;
 
 /** Banner + toast hanya sekali per sesi bila storage tidak bisa dipakai. */
@@ -78,21 +76,10 @@ function eksporJson() {
 /** Baca file .json lalu validasi & commit lewat store; pesan error spesifik. */
 async function imporJson(file, input) {
   if (!file) return;
-  if (!/\.json$/i.test(file.name)) {
-    showBanner('GAGAL IMPORT: PILIH FILE DENGAN EKSTENSI .JSON.', 'error');
-    showToast('GAGAL IMPORT: EKSTENSI FILE HARUS .JSON.', 'error');
-    if (input) input.value = '';
-    return;
-  }
-  if (file.type && file.type !== 'application/json') {
-    showBanner(IMPORT_MIME_ERROR, 'error');
-    showToast(IMPORT_MIME_ERROR, 'error');
-    if (input) input.value = '';
-    return;
-  }
-  if (file.size > MAX_IMPORT_BYTES) {
-    showBanner(IMPORT_SIZE_ERROR, 'error');
-    showToast(IMPORT_SIZE_ERROR, 'error');
+  const cekFile = validateImportFile(file);
+  if (!cekFile.ok) {
+    showBanner(cekFile.error, 'error');
+    showToast(cekFile.error, 'error');
     if (input) input.value = '';
     return;
   }

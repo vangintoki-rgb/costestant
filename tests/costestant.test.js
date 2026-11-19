@@ -1,6 +1,6 @@
+import { readFileSync } from 'node:fs';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import {
-  BATAS_SKEMA,
   PLACEHOLDER_IMAGE,
   PRODUK_SEED,
   WHATSAPP_NUMBER,
@@ -10,10 +10,15 @@ import {
   clampDurasi,
   filterProducts,
   getRentalBreakdown,
-  isValidImagePath,
   isValidWhatsAppNumber,
-  normalisasiImagePath,
 } from '../src/products.js';
+import {
+  BATAS_SKEMA,
+  isValidImagePath,
+  normalisasiImagePath,
+  validateImportFile,
+} from '../src/store.js';
+import { validateProductDraft } from '../src/ui.js';
 
 const STORAGE_KEY = 'costestant:costumes:v1';
 
@@ -364,5 +369,52 @@ describe('hardening audit — path gambar, batas skema, allow-list, ukuran paylo
     expect(store.getProducts()[0].nama).toBe('Kostum Trim');
     expect(store.getProducts()[0].imageUrl).toBe(PLACEHOLDER_IMAGE);
     expect(Object.keys(store.getProducts()[0])).not.toContain('__proto__');
+  });
+
+  it('validateImportFile menolak ekstensi, MIME, dan ukuran file tidak aman', () => {
+    expect(
+      validateImportFile({ name: 'backup.json', type: 'application/json', size: 10 }).ok,
+    ).toBe(true);
+    expect(validateImportFile({ name: 'backup.txt', type: 'application/json', size: 10 }).ok).toBe(false);
+    expect(validateImportFile({ name: 'backup.json', type: 'text/plain', size: 10 }).ok).toBe(false);
+    expect(
+      validateImportFile({ name: 'backup.json', type: 'application/json', size: 1_000_001 }).ok,
+    ).toBe(false);
+    expect(validateImportFile(null).ok).toBe(false);
+  });
+
+  it('validateProductDraft menolak path gambar berbahaya', () => {
+    const draft = {
+      nama: 'Kostum Uji',
+      asal: 'Series Uji',
+      kategori: 'Anime',
+      ukuran: 'M',
+      hargaPer2Hari: '100000',
+      stok: '1',
+      status: 'Tersedia',
+      deskripsi: 'Lengkap: kostum, wig, dan aksesoris sesuai tema.',
+      imageUrl: 'javascript:example',
+    };
+
+    expect(validateProductDraft(draft).errors.imageUrl).toBeTruthy();
+  });
+});
+
+describe('hardening audit — konfigurasi CSP & font', () => {
+  const html = readFileSync(new URL('../index.html', import.meta.url), 'utf8');
+
+  it('index.html memuat CSP dengan direktif pembatas yang wajib', () => {
+    expect(html).toMatch(/http-equiv="Content-Security-Policy"/);
+    expect(html).toMatch(/object-src 'none'/);
+    expect(html).toMatch(/base-uri 'none'/);
+    expect(html).toMatch(/img-src 'self'/);
+    expect(html).not.toMatch(/unsafe-eval/);
+  });
+
+  it('tautan font eksternal memakai crossorigin dan di-allowlist CSP', () => {
+    expect(html).toMatch(/fonts\.googleapis\.com/);
+    expect(html).toMatch(/fonts\.gstatic\.com/);
+    expect(html).toMatch(/crossorigin="anonymous"/);
+    expect(html).toMatch(/font-src 'self' https:\/\/fonts\.gstatic\.com/);
   });
 });

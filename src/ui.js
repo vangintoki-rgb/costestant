@@ -4,7 +4,6 @@
  * (SPEC.md 4.2.8 / R3).
  */
 import {
-  BATAS_SKEMA,
   DURASI_MAX,
   DURASI_MIN,
   KATEGORI,
@@ -15,9 +14,12 @@ import {
   clampDurasi,
   formatRupiah,
   getRentalBreakdown,
+} from './products.js';
+import {
+  BATAS_SKEMA,
   isValidImagePath,
   normalisasiImagePath,
-} from './products.js';
+} from './store.js';
 
 export { formatRupiah };
 

@@ -5,17 +5,47 @@
  * terlewat dari penyimpanan (T6.3).
  */
 import {
-  BATAS_SKEMA,
   FILTER_DEFAULT,
-  ID_PATTERN,
   KATEGORI,
+  PLACEHOLDER_IMAGE,
   PRODUK_SEED,
   STATUS,
   UKURAN,
   filterProducts,
-  isValidImagePath,
-  normalisasiImagePath,
 } from './products.js';
+
+/**
+ * Audit C-01/C-02: batas & helper validator didefinisikan di sini (bukan products.js)
+ * agar patch tetap berada dalam lingkup empat berkas yang disetujui.
+ */
+export const BATAS_SKEMA = Object.freeze({
+  namaMin: 3,
+  namaMax: 80,
+  asalMin: 2,
+  asalMax: 80,
+  deskripsiMin: 10,
+  deskripsiMax: 500,
+  hargaMax: 100000000,
+  stokMax: 999,
+});
+
+export const ID_PATTERN = /^[A-Za-z0-9_-]{1,64}$/;
+
+const IMAGE_PATH_REGEX = /^\/images\/[A-Za-z0-9._/-]+\.(svg|png|jpe?g|webp)$/i;
+
+export function isValidImagePath(value) {
+  if (typeof value !== 'string') return false;
+  const path = value.trim();
+  if (path === '') return true;
+  if (!path.startsWith('/images/')) return false;
+  if (path.includes('..') || path.includes('\\') || path.includes('://')) return false;
+  return IMAGE_PATH_REGEX.test(path);
+}
+
+export function normalisasiImagePath(value) {
+  const path = typeof value === 'string' ? value.trim() : '';
+  return path === '' ? PLACEHOLDER_IMAGE : path;
+}
 
 /** Key kanonik M6. Key lama M1–M5 tetap dibaca sekali untuk migrasi. */
 export const STORAGE_KEY = 'costestant:costumes:v1';
@@ -29,6 +59,23 @@ const STORAGE_WARNING =
 export const MAX_IMPORT_BYTES = 1_000_000;
 const MAX_PAYLOAD_CHARS = 1_000_000;
 const MAX_LIST_ITEMS = 500;
+
+/** Guard file impor yang bisa dipanggil UI sekaligus diuji tanpa DOM. */
+export function validateImportFile(file) {
+  if (!file || typeof file !== 'object') {
+    return { ok: false, error: 'GAGAL IMPORT: FILE TIDAK VALID.' };
+  }
+  if (!/\.json$/i.test(String(file.name ?? ''))) {
+    return { ok: false, error: 'GAGAL IMPORT: PILIH FILE DENGAN EKSTENSI .JSON.' };
+  }
+  if (file.type && file.type !== 'application/json') {
+    return { ok: false, error: 'GAGAL IMPORT: TIPE FILE HARUS APPLICATION/JSON.' };
+  }
+  if (Number(file.size) > MAX_IMPORT_BYTES) {
+    return { ok: false, error: 'GAGAL IMPORT: UKURAN FILE MELEBIHI BATAS.' };
+  }
+  return { ok: true };
+}
 
 /** Audit C-04/P-01: hanya field skema yang boleh masuk state. */
 const ALLOWED_KEYS = new Set([

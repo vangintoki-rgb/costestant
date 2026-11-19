@@ -14,42 +14,6 @@ export const STATUS = Object.freeze(['Tersedia', 'Sedang Disewa', 'Perawatan']);
 
 export const PLACEHOLDER_IMAGE = '/images/placeholder.svg';
 
-/**
- * Batas skema tunggal — dipakai form (ui.js), storage, dan import (store.js)
- * supaya jalur localStorage/import tidak lebih longgar dari form.
- */
-export const BATAS_SKEMA = Object.freeze({
-  namaMin: 3,
-  namaMax: 80,
-  asalMin: 2,
-  asalMax: 80,
-  deskripsiMin: 10,
-  deskripsiMax: 500,
-  hargaMax: 100000000,
-  stokMax: 999,
-});
-
-/** id aman untuk atribut DOM: token pendek tanpa spasi/tanda kutip. */
-export const ID_PATTERN = /^[A-Za-z0-9_-]{1,64}$/;
-
-const IMAGE_PATH_REGEX = /^\/images\/[A-Za-z0-9._/-]+\.(svg|png|jpe?g|webp)$/i;
-
-/** Hanya path lokal /images/...; menolak skema URL, traversal, dan backslash. */
-export function isValidImagePath(value) {
-  if (typeof value !== 'string') return false;
-  const path = value.trim();
-  if (path === '') return true;
-  if (!path.startsWith('/images/')) return false;
-  if (path.includes('..') || path.includes('\\') || path.includes('://')) return false;
-  return IMAGE_PATH_REGEX.test(path);
-}
-
-/** Kosong diisi placeholder; dipanggil hanya setelah isValidImagePath(). */
-export function normalisasiImagePath(value) {
-  const path = typeof value === 'string' ? value.trim() : '';
-  return path === '' ? PLACEHOLDER_IMAGE : path;
-}
-
 /** 8 kostum contoh. Dipakai ulang oleh tombol Reset ke Data Awal. */
 export const PRODUK_SEED = Object.freeze([
   {
