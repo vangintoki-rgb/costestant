@@ -3,12 +3,13 @@
  * Milestone 1: kerangka. Semua akses localStorage dibungkus try/catch
  * sesuai SPEC.md R1 / NFR4 (fallback in-memory saat storage gagal).
  */
-import { PRODUK_SEED } from './products.js';
+import { FILTER_DEFAULT, PRODUK_SEED, filterProducts } from './products.js';
 
 const STORAGE_KEY = 'costestant.kostum.v1';
 const META_KEY = 'costestant.meta.v1';
 
 let products = cloneSeed();
+let criteria = { ...FILTER_DEFAULT };
 let storageAvailable = true;
 const listeners = new Set();
 
@@ -90,6 +91,29 @@ export function getProducts() {
 
 export function getStorageStatus() {
   return storageAvailable;
+}
+
+/* ---- State pencarian/filter/sort (satu source of truth) ---- */
+
+export function getCriteria() {
+  return { ...criteria };
+}
+
+export function setCriteria(patch) {
+  criteria = { ...criteria, ...(patch ?? {}) };
+  notify();
+  return getCriteria();
+}
+
+export function resetCriteria() {
+  criteria = { ...FILTER_DEFAULT };
+  notify();
+  return getCriteria();
+}
+
+/** Pipeline cari → filter → sort, dihitung dari state saat ini. */
+export function getFilteredProducts() {
+  return filterProducts(products, criteria);
 }
 
 export function subscribe(listener) {

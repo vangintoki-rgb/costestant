@@ -115,6 +115,10 @@ select {
   transform: skewX(4deg);
 }
 
+.badge svg {
+  flex: 0 0 auto;
+}
+
 .label {
   font-size: 11px;
   font-weight: 700;
@@ -362,6 +366,20 @@ select {
 .hero-inner {
   position: relative;
   z-index: 2;
+}
+
+/* Garis diagonal 135deg khas "Midnight Channel" (dekoratif, non-interaktif) */
+.hero::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background: repeating-linear-gradient(
+    135deg,
+    transparent 0 8px,
+    rgba(17, 17, 17, 0.05) 8px 16px
+  );
+  pointer-events: none;
+  z-index: 1;
 }
 
 .channel-stamp {
@@ -667,9 +685,72 @@ select {
 }
 
 .kostum-stok {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
   color: var(--color-muted);
   font-size: 12px;
   font-weight: 700;
+}
+
+.stok-dot {
+  width: 8px;
+  height: 8px;
+  border: 1px solid var(--color-ink);
+  border-radius: 999px;
+  background: var(--color-emerald);
+}
+
+.kostum-stok--kosong {
+  color: var(--color-alert);
+}
+
+.kostum-stok--kosong .stok-dot {
+  background: var(--color-alert);
+}
+
+.card-action {
+  width: 100%;
+  margin-top: 12px;
+}
+
+.card-reason {
+  margin: 8px 0 0;
+  color: var(--color-alert);
+  font-size: 11px;
+  font-weight: 800;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+
+.kostum-stamp {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  padding: 6px 14px;
+  border: 3px solid var(--color-ink);
+  box-shadow: 4px 4px 0 var(--color-ink);
+  font-family: var(--font-display);
+  font-size: 20px;
+  font-weight: 800;
+  letter-spacing: 0.08em;
+  white-space: nowrap;
+  transform: translate(-50%, -50%) rotate(-12deg) skewX(-6deg);
+}
+
+.kostum-stamp--disewa,
+.kostum-stamp--habis {
+  background: var(--color-alert);
+  color: var(--color-paper);
+}
+
+.kostum-stamp--perawatan {
+  background: var(--color-static);
+  color: var(--color-ink);
+}
+
+.kostum-stamp--habis {
+  font-size: 16px;
 }
 
 @media (min-width: 640px) {
@@ -763,6 +844,525 @@ select {
   .stat-grid {
     grid-template-columns: repeat(3, minmax(0, 1fr));
     gap: 24px;
+  }
+}
+
+/* ------------------------------------------------------------
+   Bar kontrol pencarian / filter / sorting + empty state
+   ------------------------------------------------------------ */
+.filter-bar {
+  margin-top: 16px;
+  padding: 12px 14px;
+  background: var(--color-paper);
+  border: var(--border-hard);
+  box-shadow: var(--shadow-hard);
+}
+
+.filter-row {
+  display: flex;
+  align-items: flex-end;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+
+.filter-row--bottom {
+  margin-top: 12px;
+  padding-top: 12px;
+  border-top: var(--border-thin);
+}
+
+.field {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.field--search {
+  flex: 1 1 260px;
+}
+
+.field--chips {
+  flex: 1 1 320px;
+}
+
+.field input,
+.filter-select {
+  min-height: 44px;
+  padding: 8px 10px;
+  background: var(--color-paper);
+  border: var(--border-thin);
+}
+
+.field input {
+  width: 100%;
+}
+
+.field input::placeholder {
+  color: var(--color-muted);
+  font-size: 12px;
+  font-weight: 600;
+  text-transform: uppercase;
+}
+
+.filter-select {
+  min-width: 150px;
+  cursor: pointer;
+}
+
+.chip-row {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.chip {
+  min-height: 36px;
+  padding: 6px 12px;
+  background: var(--color-paper);
+  border: var(--border-thin);
+  font-size: 11px;
+  font-weight: 800;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  cursor: pointer;
+  transition:
+    transform 120ms ease-out,
+    box-shadow 120ms ease-out;
+}
+
+.chip:hover {
+  background: var(--color-yellow-soft);
+  box-shadow: 2px 2px 0 var(--color-ink);
+}
+
+.chip.is-active {
+  background: var(--color-yellow);
+  border: var(--border-hard);
+  box-shadow: 3px 3px 0 var(--color-ink);
+  transform: skewX(-4deg);
+}
+
+.btn-reset-filter {
+  min-height: 36px;
+  padding: 6px 10px;
+  background: var(--color-paper);
+  color: var(--color-alert);
+  border: 2px solid var(--color-alert);
+  cursor: pointer;
+}
+
+.btn-reset-filter:hover {
+  background: var(--color-alert);
+  color: var(--color-paper);
+}
+
+.filter-count {
+  margin-left: auto;
+  color: var(--color-muted);
+}
+
+.grid-host {
+  min-height: 200px;
+}
+
+.empty-state {
+  padding: 40px 20px;
+  background-color: var(--color-static);
+  background-image:
+    repeating-linear-gradient(135deg, transparent 0 8px, rgba(17, 17, 17, 0.04) 8px 16px),
+    repeating-linear-gradient(to bottom, transparent 0 3px, rgba(17, 17, 17, 0.05) 3px 4px);
+  border: var(--border-hard);
+  box-shadow: var(--shadow-hard);
+  text-align: center;
+}
+
+.empty-icon {
+  display: flex;
+  justify-content: center;
+  margin-bottom: 12px;
+}
+
+.empty-title {
+  margin: 0 0 8px;
+  font-size: 24px;
+  line-height: 1.2;
+  text-transform: uppercase;
+}
+
+.empty-sub {
+  margin: 0 0 18px;
+  color: var(--color-muted);
+}
+
+@media (min-width: 1024px) {
+  .filter-bar {
+    position: sticky;
+    top: 64px;
+    z-index: 20;
+  }
+}
+
+/* ------------------------------------------------------------
+   Modal detail + kalkulator sewa + WhatsApp (M4)
+   ------------------------------------------------------------ */
+body.modal-open {
+  overflow: hidden;
+}
+
+.modal-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 50;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 24px;
+  background: rgba(17, 17, 17, 0.72);
+}
+
+.modal-overlay[hidden] {
+  display: none;
+}
+
+.modal-overlay::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background: repeating-linear-gradient(
+    to bottom,
+    transparent 0 3px,
+    rgba(255, 255, 255, 0.05) 3px 4px
+  );
+  pointer-events: none;
+}
+
+.modal-panel {
+  position: relative;
+  z-index: 51;
+  width: 100%;
+  max-width: 760px;
+  max-height: 90vh;
+  overflow-y: auto;
+  background: var(--color-paper);
+  border: var(--border-hard);
+  border-radius: 4px;
+  box-shadow: 8px 8px 0 var(--color-ink);
+  animation: modal-in 150ms ease-out;
+}
+
+@keyframes modal-in {
+  from {
+    opacity: 0;
+    transform: translateY(8px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.modal-header {
+  position: sticky;
+  top: 0;
+  z-index: 2;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 14px 18px;
+  background: var(--color-yellow);
+  border-bottom: var(--border-hard);
+}
+
+.modal-title {
+  margin: 0;
+  font-size: 24px;
+  line-height: 1.2;
+}
+
+.modal-close {
+  flex: 0 0 auto;
+  width: 36px;
+  height: 36px;
+  background: var(--color-ink);
+  color: var(--color-paper);
+  border: var(--border-hard);
+  box-shadow: 3px 3px 0 var(--color-ink);
+  font-size: 16px;
+  font-weight: 800;
+  line-height: 1;
+  cursor: pointer;
+}
+
+.modal-body {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 18px;
+  padding: 18px;
+}
+
+.modal-media {
+  position: relative;
+  border: var(--border-hard);
+  overflow: hidden;
+}
+
+.modal-media img {
+  display: block;
+  width: 100%;
+  aspect-ratio: 4 / 5;
+  object-fit: cover;
+  border-bottom: var(--border-hard);
+}
+
+.modal-media-badges {
+  position: absolute;
+  top: 10px;
+  left: 10px;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 6px;
+}
+
+.modal-meta {
+  display: grid;
+  grid-template-columns: auto 1fr;
+  gap: 6px 14px;
+  margin: 0 0 16px;
+}
+
+.modal-meta dt {
+  color: var(--color-muted);
+}
+
+.modal-meta dd {
+  margin: 0;
+  font-size: 14px;
+  font-weight: 600;
+}
+
+.modal-desc {
+  margin-bottom: 16px;
+  padding: 12px;
+  background: var(--color-static);
+  border: var(--border-thin);
+}
+
+.modal-desc h3 {
+  margin: 0 0 6px;
+}
+
+.modal-desc-text {
+  margin: 0;
+  font-size: 14px;
+}
+
+.calc-panel {
+  margin-bottom: 16px;
+  padding: 14px;
+  background: var(--color-static);
+  border: var(--border-hard);
+  box-shadow: var(--shadow-hard);
+}
+
+.calc-title {
+  margin: 0 0 12px;
+}
+
+.calc-field {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 10px;
+  margin-bottom: 12px;
+}
+
+.calc-field > .label {
+  min-width: 104px;
+}
+
+.calc-date {
+  flex: 1 1 180px;
+  min-height: 44px;
+  padding: 8px 10px;
+  background: var(--color-paper);
+  border: var(--border-hard);
+  font-size: 14px;
+}
+
+.stepper {
+  display: flex;
+  align-items: center;
+}
+
+.stepper-btn,
+.stepper-input {
+  min-height: 44px;
+  background: var(--color-paper);
+  border: var(--border-hard);
+  font-weight: 800;
+}
+
+.stepper-btn {
+  width: 44px;
+  font-size: 20px;
+  cursor: pointer;
+}
+
+.stepper-input {
+  width: 72px;
+  text-align: center;
+  font-size: 20px;
+  font-variant-numeric: tabular-nums;
+  appearance: textfield;
+  -moz-appearance: textfield;
+}
+
+.stepper-input::-webkit-outer-spin-button,
+.stepper-input::-webkit-inner-spin-button {
+  margin: 0;
+  appearance: none;
+  -webkit-appearance: none;
+}
+
+.duration-presets {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px;
+  margin: 0 0 14px;
+}
+
+.duration-preset {
+  min-height: 32px;
+  padding: 5px 9px;
+  background: var(--color-paper);
+  border: var(--border-thin);
+  cursor: pointer;
+}
+
+.duration-preset.is-active {
+  background: var(--color-yellow);
+  border: var(--border-hard);
+  box-shadow: 2px 2px 0 var(--color-ink);
+}
+
+.calc-breakdown {
+  padding-top: 10px;
+  border-top: var(--border-thin);
+}
+
+.calc-row {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 6px;
+  font-size: 12px;
+  font-weight: 700;
+  text-transform: uppercase;
+}
+
+.calc-amount {
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+
+.calc-total {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin-top: 10px;
+  padding: 10px 14px;
+  background: var(--color-yellow);
+  border: var(--border-hard);
+  box-shadow: 3px 3px 0 var(--color-ink);
+  transform: skewX(-2deg);
+}
+
+.calc-total > * {
+  transform: skewX(2deg);
+}
+
+.calc-total-value {
+  font-size: 28px;
+  font-weight: 800;
+  font-variant-numeric: tabular-nums;
+}
+
+.simulate-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-bottom: 16px;
+  cursor: pointer;
+}
+
+.simulate-check {
+  flex: 0 0 auto;
+  width: 20px;
+  height: 20px;
+  accent-color: var(--color-ink);
+  cursor: pointer;
+}
+
+.simulate-check:disabled + span {
+  opacity: 0.5;
+}
+
+.wa-slot .btn-whatsapp {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  width: 100%;
+  text-decoration: none;
+}
+
+.wa-slot .btn-whatsapp:hover {
+  background: #0ea472;
+  color: var(--color-ink);
+}
+
+.wa-slot .btn[disabled]:hover {
+  transform: none;
+  box-shadow: none;
+}
+
+.wa-reason {
+  margin: 0 0 10px;
+  color: var(--color-alert);
+  font-size: 12px;
+  font-weight: 800;
+  text-transform: uppercase;
+}
+
+@media (min-width: 768px) {
+  .modal-body {
+    grid-template-columns: 280px minmax(0, 1fr);
+  }
+}
+
+@media (max-width: 639px) {
+  .modal-overlay {
+    padding: 12px;
+  }
+
+  .modal-panel {
+    max-height: 94vh;
+  }
+
+  .modal-body {
+    padding: 14px;
+  }
+
+  .modal-title {
+    font-size: 20px;
+  }
+
+  .calc-total-value {
+    font-size: 24px;
   }
 }
 

@@ -74,32 +74,34 @@
 **Gate masuk:** Gate M1 lolos.
 **Gate keluar:** 8 kartu tampil lengkap dengan badge, harga, stok, status; statistik 8 / 17 / 1 muncul.
 
-- [ ] **T2.1 — Tulis 8 data contoh kostum nonpribadi**
+> **Catatan implementasi (M2):** Sesuai instruksi eksekusi dan batasan IP di `UI-SPEC.md` Bagian 0, 8 seed memakai **nama kostum/series fiktif** (bukan tabel 4.6 yang memakai karakter berhak cipta). Komposisi tetap 8 data, 3 `unggulan`, stok tersedia 17, 1 `Sedang Disewa`, dan mayoritas harga `100000`, sehingga angka 8 / 17 / 1 tetap valid. Kata kunci contoh AC B1–B9 perlu disesuaikan dengan nama fiktif saat M3. Ilustrasi dibuat lokal sebagai 9 SVG di `public/images` (tanpa fetch eksternal).
+
+- [x] **T2.1 — Tulis 8 data contoh kostum nonpribadi**
   - **Deskripsi:** Ekspor `KOSTUM_SEED` dari `src/data/seed.js` berisi 8 objek persis tabel `SPEC.md` 4.6 (id UUID unik, `hargaPer2Hari`, `stok`, `status`, `unggulan`, `imageUrl`). `deskripsi` bahasa Indonesia menyebut wig/aksesoris/senjata.
   - **AC (manual browser):** Di Console, `import('/src/data/seed.js').then(m => console.log(m.KOSTUM_SEED.length))` menghasilkan **8**; tidak ada nama/nomor/alamat pribadi; 3 kostum ber-`unggulan: true`.
   - **File:** `src/data/seed.js`
 
-- [ ] **T2.2 — Buat 9 aset placeholder SVG lokal**
+- [x] **T2.2 — Buat 9 aset placeholder SVG lokal**
   - **Deskripsi:** Buat `kostum-01.svg` … `kostum-08.svg` (ilustrasi pop-art sederhana: topeng/wig/siluet, kuning-hitam-merah) dan `placeholder.svg` generik di `public/images`.
   - **AC (manual browser):** Buka langsung `http://localhost:5173/images/kostum-01.svg` dan `/images/placeholder.svg` → gambar tampil, bukan 404/teks error; total ukuran ke-9 file < 100 KB.
   - **File:** `public/images/kostum-01.svg`, `public/images/kostum-02.svg`, `public/images/kostum-03.svg`, `public/images/kostum-04.svg`, `public/images/kostum-05.svg`, `public/images/kostum-06.svg`, `public/images/kostum-07.svg`, `public/images/kostum-08.svg`, `public/images/placeholder.svg`
 
-- [ ] **T2.3 — Navbar: logo miring, nav, stock chip**
+- [x] **T2.3 — Navbar: logo miring, nav, stock chip**
   - **Deskripsi:** Render per `UI-SPEC.md` 3.1: badge `COSTESTANT` kuning skew `-6deg` + shadow keras, 2 item nav UPPERCASE, chip `STOK: 17` dihitung dari seed dengan rumus `SPEC.md` 4.3.
   - **AC (manual browser):** Logo miring & berbayang keras; chip menampilkan **17**; hover nav → latar kuning; navbar tetap menempel saat halaman di-scroll; di 375px navbar jadi 2 baris (logo+angka, lalu 2 tombol tab).
   - **File:** `src/ui/layout.js`, `src/main.js`, `src/styles.css`
 
-- [ ] **T2.4 — Hero section + search bar + CTA**
+- [x] **T2.4 — Hero section + search bar + CTA**
   - **Deskripsi:** Render per `UI-SPEC.md` 3.2: latar kuning + scanline, headline `SEWA KOSTUM COSPLAY`, tagline, input `CARI KARAKTER ATAU SERIES...`, tombol `CARI`, CTA `LIHAT KATALOG`, hiasan `CHANNEL 04 // RENTAL`.
   - **AC (manual browser):** Teks di atas kuning berwarna hitam dan terbaca; tombol `CARI` hitam-teks kuning; klik `LIHAT KATALOG` menggulung halus ke grid; tombol tetap bisa diklik meski ada overlay scanline.
   - **File:** `src/ui/layout.js`, `src/styles.css`
 
-- [ ] **T2.5 — Grid kartu + StatusBadge + ribbon harga**
+- [x] **T2.5 — Grid kartu + StatusBadge + ribbon harga**
   - **Deskripsi:** Render 8 kartu `aspect-[4/5]` per `UI-SPEC.md` 3.4: badge asal, bintang unggulan, tag ukuran, ribbon `RP 100.000 / 2 HARI`, nama, stok, badge status, tombol `LIHAT DETAIL`. Satu komponen `StatusBadge` dipakai ulang.
   - **AC (manual browser):** **A1, A2** lolos: tepat 8 kartu; 3 variasi warna badge (emerald/merah/abu); bintang hanya di 3 kartu; gambar tidak broken; hover kartu naik dengan shadow 6px; di 1280px tampil 4 kolom, di 375px 1 kolom.
   - **File:** `src/ui/catalog.js`, `src/ui/components.js`, `src/styles.css`
 
-- [ ] **T2.6 — Kerangka Dashboard + 3 kartu statistik dari seed**
+- [x] **T2.6 — Kerangka Dashboard + 3 kartu statistik dari seed**
   - **Deskripsi:** Buat panel dashboard dengan 3 kartu per `UI-SPEC.md` 3.6; hitung `totalKatalog`, `unitStokTersedia`, `kostumDisewa` dari array seed (rumus `SPEC.md` 4.3).
   - **AC (manual browser):** Buka tab Dashboard → angka **8 / 17 / 1**; strip atas kartu berturut-turut kuning / emerald / merah; Samus (Perawatan, stok 0) dan Luffy (Disewa) tidak masuk angka 17.
   - **File:** `src/ui/dashboard.js`, `src/main.js`, `src/styles.css`
@@ -112,27 +114,29 @@
 **Gate masuk:** 8 kartu sudah tampil.
 **Gate keluar:** AC B1–B10 lolos.
 
-- [ ] **T3.1 — State pusat pencarian/filter/sort**
+> **Catatan implementasi (M3):** Fungsi murni `filterProducts(products, criteria)` diekspor dari `src/products.js` (bukan modul baru). Satu source of truth untuk kriteria ada di `src/store.js` (`getCriteria` / `setCriteria` / `resetCriteria`), bukan `src/state.js` terpisah, agar tetap mengikuti struktur file M1/M2. Seluruh AC dijalankan dengan kata kunci **nama fiktif** (mis. `luna` menggantikan `naruto`, ` Nova` menggantikan `kamen`, `aurora` menggantikan `witcher`) karena seed M2 memakai kostum nonpribadi. Selain itu ditambahkan opsi sort `nama-asc` sesuai instruksi eksekusi. Bar filter bersifat statis saat grid di-render ulang agar fokus input tidak reset.
+
+- [x] **T3.1 — State pusat pencarian/filter/sort**
   - **Deskripsi:** Buat `src/state.js` sebagai satu source of truth (`{ query, kategori, ukuran, status, sort }`); hubungkan input hero dan input filter bar ke state yang sama; `main.js` menurunkan state ke `catalog.js`.
   - **AC (manual browser):** Ketik `luffy` di hero → input di bar filter otomatis ikut terisi `luffy`; hapus di filter → hero ikut kosong; pipeline tetap urut cari→filter→sort saat dikombinasikan.
   - **File:** `src/state.js` (baru), `src/main.js`, `src/ui/layout.js`, `src/ui/catalog.js`
 
-- [ ] **T3.2 — Pencarian real-time nama atau asal series**
+- [x] **T3.2 — Pencarian real-time nama atau asal series**
   - **Deskripsi:** Terapkan `toLowerCase().includes()` pada `nama` **ATAU** `asal`; update grid langsung saat `input` (tanpa tombol).
   - **AC (manual browser):** **B1, B2, B3** lolos: `naruto` → 1 kartu; `witcher` → Geralt; `NARUTO` kapital → tetap ketemu; menghapus teks → 8 kartu kembali.
   - **File:** `src/ui/catalog.js`, `src/state.js`
 
-- [ ] **T3.3 — Filter kategori, ukuran, status (AND)**
+- [x] **T3.3 — Filter kategori, ukuran, status (AND)**
   - **Deskripsi:** Pasang chip kategori, select ukuran, select status; gabungan filter bersifat AND; chip aktif kuning miring + shadow keras.
   - **AC (manual browser):** **B4, B5, B6, B7** lolos: Tokusatsu → 2 kartu; All Size → 2 kartu; Perawatan → hanya Samus; `kamen` + Tokusatsu + XL → tepat 1 kartu.
   - **File:** `src/ui/catalog.js`, `src/state.js`, `src/styles.css`
 
-- [ ] **T3.4 — Sorting 3 mode + counter hasil**
+- [x] **T3.4 — Sorting 3 mode + counter hasil**
   - **Deskripsi:** Implementasi `Kostum Unggulan` (default: unggulan dulu, lalu nama A–Z), `Harga Terendah`, `Harga Tertinggi`; tampilkan teks `N HASIL` yang mengikuti hasil.
   - **AC (manual browser):** **B8, B9** lolos: termurah Starlight Wanderer (`Rp 90.000`) di atas; termahal Geralt (`Rp 200.000`) di atas; default unggulan menampilkan Sailor Moon, Naruto, Luffy berurutan A–Z; counter berubah sesuai filter.
   - **File:** `src/ui/catalog.js`, `src/state.js`
 
-- [ ] **T3.5 — Empty state + tombol Hapus Filter**
+- [x] **T3.5 — Empty state + tombol Hapus Filter**
   - **Deskripsi:** Jika hasil 0, ganti grid dengan panel `UI-SPEC.md` 3.4/5.1: ikon TV static, `TIDAK ADA KOSTUM YANG COCOK.`, tombol merah outline `HAPUS FILTER`.
   - **AC (manual browser):** **B10** lolos: cari `zzzz` → empty state muncul; klik `HAPUS FILTER` → query & semua filter kembali default, 8 kartu tampil, counter `8 HASIL`; Console tidak error.
   - **File:** `src/ui/catalog.js`, `src/ui/components.js`, `src/styles.css`
@@ -145,32 +149,38 @@
 **Gate masuk:** AC B1–B10 lolos.
 **Gate keluar:** AC C1–C8 dan D1–D4 lolos (D4 boleh in-memory).
 
-- [ ] **T4.1 — Modal detail + 3 cara tutup + focus management**
+> **Catatan implementasi (M4):**
+> 1. Sesuai konfirmasi, rumus memakai **`SPEC.md` 4.4**, bukan contoh `ceil(durasi/2) × harga` pada instruksi: `total = hargaPer2Hari + (durasi−2) × ceil(hargaPer2Hari/2)`. Jadi 5 hari @ Rp100.000 = **Rp250.000** (AC C5/C6 tetap lolos); rumus alternatif akan memberi Rp300.000.
+> 2. Durasi menyediakan **keduanya**: stepper + input angka 2–30 (step 1, sehingga 5 hari bisa diuji) **dan** pintasan chip kelipatan 2 hari (2/4/6/8/10).
+> 3. Helper murni (`calculateRentalTotal`, `getRentalBreakdown`, `buildWhatsAppMessage`, `buildWhatsAppUrl`, validasi nomor) ditempatkan di `src/products.js`; modal dibangun di `src/ui.js`; simulasi sewa memakai `updateProduct()` di `src/store.js` (tanpa modul `utils.js` / `src/ui/detailModal.js` baru).
+> 4. AC C/D dijalankan dengan nama seed fiktif M2 (mis. `Luna Silver` menggantikan `Sailor Moon`). Nomor `6281234567890` tetap placeholder. Tidak ada payment gateway / API WA.
+
+- [x] **T4.1 — Modal detail + 3 cara tutup + focus management**
   - **Deskripsi:** Bangun modal per `UI-SPEC.md` 4.2/5.2: header kuning, gambar, metadata, panel `KELENGKAPAN KOSTUM`, tombol ✕; tutup via ✕ / overlay / `Esc`; fokus masuk ke modal dan kembali ke kartu pemicu.
   - **AC (manual browser):** **C1, C2** lolos: klik kartu → deskripsi "Lengkap: wig blonde, mahkota…" tampil; ✕, klik luar, dan `Esc` semuanya menutup; setelah tutup fokus kembali ke tombol kartu yang diklik.
   - **File:** `src/ui/detailModal.js` (baru), `src/ui/components.js`, `src/main.js`, `src/styles.css`
 
-- [ ] **T4.2 — Input tanggal mulai & durasi dengan clamp**
+- [x] **T4.2 — Input tanggal mulai & durasi dengan clamp**
   - **Deskripsi:** `<input type="date">` dengan `min` = hari ini dan default hari ini; stepper `− / angka / +` dengan `clamp(2, 30)` sesuai `SPEC.md` 4.4.
   - **AC (manual browser):** **C3, C4** lolos: tanggal kemarin tidak bisa dipilih; durasi default 2; mengisi `0` atau `1` → langsung menjadi `2`; mengisi `31` → menjadi `30`; tombol `+` di 30 tidak menambah.
   - **File:** `src/ui/detailModal.js`, `src/utils.js`
 
-- [ ] **T4.3 — Kalkulator otomatis + rincian + total mencolok**
+- [x] **T4.3 — Kalkulator otomatis + rincian + total mencolok**
   - **Deskripsi:** Terapkan `hitungSewa()` (`hargaHariTambahan = ceil(harga/2)`); tampilkan baris paket 2 hari, baris tambahan (tetap tampil `Rp 0` saat 0 hari), dan strip total kuning; formatter Rupiah `id-ID`.
   - **AC (manual browser):** **C5, C6, C7** lolos: Sailor Moon 2 hari → **Rp 100.000**; ubah ke 5 hari → **Rp 250.000** (3 × Rp 50.000) tanpa tombol hitung; ganti tanggal → nominal tidak berubah.
   - **File:** `src/utils.js`, `src/ui/detailModal.js`, `src/styles.css`
 
-- [ ] **T4.4 — Generator pesan & tautan `wa.me` pre-filled**
+- [x] **T4.4 — Generator pesan & tautan `wa.me` pre-filled**
   - **Deskripsi:** Susun pesan persis `SPEC.md` 4.5 (nama, asal, ukuran, tanggal `YYYY-MM-DD`, durasi + rincian hari, estimasi); URL = `https://wa.me/6281234567890?text=${encodeURIComponent(pesan)}`, buka di tab baru dengan `rel="noopener noreferrer"`.
   - **AC (manual browser):** **D1, D2** lolos: klik `SEWA VIA WHATSAPP` → tab baru ke `wa.me/6281234567890`; pesan berisi 6 informasi dan `Rp 250.000`; spasi/newline ter-encode rapi (tidak rusak); tombol WA hijau dengan **teks hitam**.
   - **File:** `src/utils.js`, `src/ui/detailModal.js`, `src/data/seed.js`
 
-- [ ] **T4.5 — Nonaktifkan WA saat kostum tidak tersedia**
+- [x] **T4.5 — Nonaktifkan WA saat kostum tidak tersedia**
   - **Deskripsi:** Terapkan `F2.8`: tombol disabled jika `status !== 'Tersedia'` **atau** `stok === 0`; ganti ikon peringatan dan tampilkan alasan merah `KOSTUM TIDAK TERSEDIA UNTUK DISEWA.`
   - **AC (manual browser):** **C8** lolos: modal Luffy (Disewa), Samus (Perawatan), dan kostum stok 0 → tombol abu, tidak bisa diklik, alasan merah muncul; Sailor Moon tetap aktif.
   - **File:** `src/ui/detailModal.js`, `src/ui/components.js`
 
-- [ ] **T4.6 — Checkbox simulasi sewa (stok & status)**
+- [x] **T4.6 — Checkbox simulasi sewa (stok & status)**
   - **Deskripsi:** Checkbox `TANDAI SEBAGAI DISEWA (SIMULASI)`; saat klik WA dan dicentang, jalankan jalur ke-2 `SPEC.md` 4.4 (stok > 1 → stok−1; stok === 1 → stok 0 + status `Sedang Disewa`); toast sukses.
   - **AC (manual browser):** **D4** lolos: Sailor Moon stok 3 → 2, status tetap Tersedia; ulangi sampai 0 → status berubah `DISEWA`, badge kartu & tombol WA ikut berubah; di M6 perubahan ini akan persisten.
   - **File:** `src/ui/detailModal.js`, `src/state.js`, `src/ui/components.js`
