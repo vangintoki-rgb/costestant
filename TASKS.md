@@ -39,27 +39,29 @@
 **Gate masuk:** Folder kerja kosong / hanya berisi `SPEC.md`, `UI-SPEC.md`, `TASKS.md`.
 **Gate keluar:** `npm run dev` membuka halaman bertema kuning-hitam, 2 tab bisa diklik, Console bersih.
 
-- [ ] **T1.1 — Inisialisasi proyek Vite (Vanilla JS)**
+> **Catatan implementasi (M1):** Mengikuti opsi ringan pada instruksi eksekusi, Tailwind/PostCSS tidak dipasang. Design token ditulis sebagai CSS custom variables di `src/style.css`, dan modul disusun sebagai `src/products.js`, `src/store.js`, `src/ui.js`, `src/main.js` (tanpa `vite.config.js`, `tailwind.config.js`, `postcss.config.js`, `src/styles.css`, `src/data/`, `src/ui/`). Gate keluar M1 tetap terpenuhi.
+
+- [x] **T1.1 — Inisialisasi proyek Vite (Vanilla JS)**
   - **Deskripsi:** Buat `package.json` dengan script `dev`, `build`, `preview`; pasang Vite; `index.html` minimal dengan `<div id="app">` dan `<script type="module" src="/src/main.js">`.
   - **AC (manual browser):** Buka URL Vite (default `http://localhost:5173`) → halaman kosong tampil tanpa 404; DevTools → Console tidak ada error `Failed to resolve module`; tidak muncul prompt login.
   - **File:** `package.json`, `index.html`, `vite.config.js`, `.gitignore` (baru)
 
-- [ ] **T1.2 — Pasang & konfigurasi Tailwind CSS via PostCSS**
+- [x] **T1.2 — Pasang & konfigurasi Tailwind CSS via PostCSS**
   - **Deskripsi:** Tambah Tailwind + PostCSS, buat `src/styles.css` berisi `@tailwind base/components/utilities`, import dari `main.js`.
   - **AC (manual browser):** Utility Tailwind langsung bekerja (mis. `bg-[#FFE600]` mengubah latar jadi kuning); mengubah `styles.css` memicu hot reload tanpa refresh manual.
   - **File:** `tailwind.config.js`, `postcss.config.js`, `src/styles.css`, `src/main.js`
 
-- [ ] **T1.3 — Definisikan design token Persona 4**
+- [x] **T1.3 — Definisikan design token Persona 4**
   - **Deskripsi:** Di `tailwind.config.js`, daftarkan warna (`yellow #FFE600`, `yellowSoft #FACC15`, `ink #111111`, `paper #FFFFFF`, `static #F3F4F6`, `alert #E60012`, `emerald #10B981`, `muted #4B5563`), `fontFamily.poppins`, `boxShadow.hard/hardLg/press/yellow`, dan ketebalan border 3px.
   - **AC (manual browser):** Halaman uji sementara menampilkan badge kuning dengan teks **hitam** (bukan putih), kartu putih ber-border hitam 3px, dan bayangan keras `4px 4px 0 #111111` tanpa blur.
   - **File:** `tailwind.config.js`, `src/styles.css`, `index.html`
 
-- [ ] **T1.4 — Tipografi global + efek scanline**
+- [x] **T1.4 — Tipografi global + efek scanline**
   - **Deskripsi:** Muat Poppins (via `@import`/link font), atur label UPPERCASE 11px `letter-spacing .06em`, deskripsi sentence case, dan utility `.scanlines` (garis 1px tiap 4px, `pointer-events: none`, opacity ~0.12).
   - **AC (manual browser):** Teks headline tampil tebal geometris; label badge terbaca UPPERCASE; overlay scanline terlihat tipis tetapi tombol di bawahnya tetap bisa diklik (uji klik tombol uji).
   - **File:** `index.html`, `src/styles.css`
 
-- [ ] **T1.5 — Struktur folder + enum + routing 2 tab**
+- [x] **T1.5 — Struktur folder + enum + routing 2 tab**
   - **Deskripsi:** Buat struktur sesuai `SPEC.md` 5.1; isi konstanta `KATEGORI`, `UKURAN`, `STATUS`, `WHATSAPP_NUMBER = '6281234567890'` (komentar `PLACEHOLDER`); navbar sederhana mengganti panel Katalog/Dashboard tanpa reload.
   - **AC (manual browser):** Folder `src/data`, `src/ui`, `public/images` ada; klik tab **KATALOG KOSTUM** ⇄ **DASHBOARD PENGELOLA** mengganti konten tanpa URL berubah; tab aktif berlatar hitam-teks kuning; Console bersih.
   - **File:** `src/main.js`, `src/data/seed.js`, `src/ui/components.js` (baru), `src/ui/layout.js` (baru)

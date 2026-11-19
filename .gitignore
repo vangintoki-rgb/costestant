@@ -1,0 +1,10 @@
+# Dependensi & build
+node_modules/
+dist/
+
+# Variabel lingkungan
+.env
+.env.*
+
+# File sistem operasi
+.DS_Store
